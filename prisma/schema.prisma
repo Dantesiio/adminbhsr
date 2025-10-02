@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+   id           String   @id @default(cuid())
+   email        String   @unique
+   name         String?
+   role         Role     @default(SOLICITANTE)
+   passwordHash String?
+   createdAt    DateTime @default(now())
+   updatedAt    DateTime @updatedAt
+
+   // relaciones
+   requests     RQ[]
+   approvals    Approval[]
+   fileAssets   FileAsset[]
+}
+
+enum Role {
+  SOLICITANTE
+  COMPRAS
+  AUTORIZADOR
+  ADMIN
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  client    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rqs RQ[]
+}
+
+model CostCenter {
+  id     String  @id @default(cuid())
+  code   String  @unique
+  name   String
+  active Boolean @default(true)
+
+  rqs RQ[]
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  nit       String?  @unique
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotes   Quote[]
+  pos      PO[]         @relation("POSupplier")
+  chosenIn Comparison[] @relation("ComparisonChosenSupplier") // <— agregado
+}
+
+model RQ {
+  id           String      @id @default(cuid())
+  code         String      @unique
+  title        String
+  description  String?
+  status       RQStatus    @default(DRAFT)
+  projectId    String
+  project      Project     @relation(fields: [projectId], references: [id])
+  costCenterId String?
+  costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
+  requesterId  String
+  requester    User        @relation(fields: [requesterId], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  items      RQItem[]
+  quotes     Quote[]
+  comparison Comparison?
+  approvals  Approval[]
+  po         PO?
+  receipts   Receipt[] // <— agregado
+}
+
+enum RQStatus {
+   DRAFT
+   ENVIADA_COMPRAS
+   EN_COMPARATIVO
+   EN_AUTORIZACION
+   APROBADA
+   OC_EMITIDA
+   CERRADA
+}
+
+model RQItem {
+  id   String  @id @default(cuid())
+  rqId String
+  rq   RQ      @relation(fields: [rqId], references: [id])
+  name String
+  spec String?
+  qty  Decimal @db.Decimal(12, 2)
+  uom  String? // unidad
+
+  quoteItems QuoteItem[] // <— agregado
+}
+
+model Quote {
+   id         String    @id @default(cuid())
+   rqId       String
+   rq         RQ        @relation(fields: [rqId], references: [id])
+   supplierId String
+   supplier   Supplier  @relation(fields: [supplierId], references: [id])
+   currency   String    @default("COP")
+   total      Decimal   @db.Decimal(14, 2)
+   validez    DateTime?
+   leadTime   String?
+   notes      String?
+   createdAt  DateTime  @default(now())
+   updatedAt  DateTime  @updatedAt
+
+   items QuoteItem[]
+}
+
+model QuoteItem {
+  id       String  @id @default(cuid())
+  quoteId  String
+  quote    Quote   @relation(fields: [quoteId], references: [id])
+  rqItemId String?
+  rqItem   RQItem? @relation(fields: [rqItemId], references: [id])
+  price    Decimal @db.Decimal(14, 2)
+  qty      Decimal @db.Decimal(12, 2)
+  uom      String?
+  specNote String?
+}
+
+model Comparison {
+   id         String    @id @default(cuid())
+   rqId       String    @unique
+   rq         RQ        @relation(fields: [rqId], references: [id])
+   chosenId   String?
+   chosen     Supplier? @relation("ComparisonChosenSupplier", fields: [chosenId], references: [id])
+   checklist  Json?
+   publishedAt DateTime?
+   createdAt  DateTime  @default(now())
+   updatedAt  DateTime  @updatedAt
+}
+
+enum ApprovalStatus {
+   PENDIENTE
+   APROBADO
+   RECHAZADO
+}
+
+model Approval {
+   id        String        @id @default(cuid())
+   rqId      String
+   rq        RQ            @relation(fields: [rqId], references: [id])
+   approverId String
+   approver  User          @relation(fields: [approverId], references: [id])
+   status    ApprovalStatus @default(PENDIENTE)
+   comment   String?
+   createdAt DateTime      @default(now())
+   updatedAt DateTime      @updatedAt
+}
+
+model PO {
+  id         String   @id @default(cuid())
+  number     String   @unique
+  rqId       String   @unique
+  rq         RQ       @relation(fields: [rqId], references: [id])
+  supplierId String
+  supplier   Supplier @relation("POSupplier", fields: [supplierId], references: [id]) // <— nombrada
+  currency   String   @default("COP")
+  total      Decimal  @db.Decimal(14, 2)
+  pdfUrl     String?
+  createdAt  DateTime @default(now())
+}
+
+enum ReceiptStatus {
+   PENDIENTE
+   CONFORME
+   NO_CONFORME
+}
+
+enum EntityType {
+   RQ
+   QUOTE
+   SUPPLIER
+   PO
+   RECEIPT
+}
+
+model Receipt {
+   id        String       @id @default(cuid())
+   rqId      String
+   rq        RQ           @relation(fields: [rqId], references: [id])
+   status    ReceiptStatus @default(PENDIENTE)
+   notes     String?
+   createdAt DateTime     @default(now())
+   updatedAt DateTime     @updatedAt
+}
+
+model FileAsset {
+   id           String     @id @default(cuid())
+   entityType   EntityType
+   entityId     String
+   name         String
+   mimeType     String
+   size         Int
+   storageKey   String
+   urlSigned    String?
+   uploadedById String
+   uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+   createdAt    DateTime   @default(now())
+   updatedAt    DateTime   @updatedAt
+}
+
+model NotificationLog {
+   id        String   @id @default(cuid())
+   type      String
+   entityRef String
+   to        String
+   subject   String
+   payload   Json?
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt
+}
+
+model Setting {
+   id        String   @id @default(cuid())
+   key       String   @unique
+   value     Json
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt
+}
