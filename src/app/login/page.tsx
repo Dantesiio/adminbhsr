@@ -57,11 +57,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-10 px-3 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start justify-center">
           {/* Login Form */}
-          <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-lg w-full max-w-md">
             <div className="text-center mb-8">
               <div className="mx-auto h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,7 +76,7 @@ function LoginForm() {
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-5 sm:space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                   Correo Electrónico
