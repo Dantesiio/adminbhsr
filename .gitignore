@@ -1,5 +1,34 @@
+# Dependencies
 node_modules
-# Keep environment variables out of version control
-.env
 
+# Next.js build output
+.next/
+out/
+
+# Production build
+build/
+dist/
+
+# Environment variables
+.env
+.env*.local
+
+# Generated files
 /generated/prisma
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+*.pem
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
