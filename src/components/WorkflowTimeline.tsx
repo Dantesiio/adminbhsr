@@ -53,19 +53,20 @@ export function WorkflowTimeline({ currentStatus, compact = false }: WorkflowTim
         )}
       </div>
 
-      <div
-        className={clsx(
-          'relative flex flex-col md:flex-row',
-          compact ? 'gap-3 md:gap-4' : 'gap-4 md:gap-6'
-        )}
-      >
+      <div className={clsx('max-w-full overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
+        <div
+          className={clsx(
+            'relative flex flex-col md:flex-row md:flex-wrap',
+            compact ? 'gap-3 md:gap-4' : 'gap-4 md:gap-6'
+          )}
+        >
         {workflowPath.map((status, index) => {
           const stage = workflowStages[status]
           const isCompleted = activeIndex > index
           const isActive = activeIndex === index && !rejected
 
           return (
-            <div key={status} className={clsx('flex-1 min-w-[140px]')}> 
+            <div key={status} className={clsx('flex-1 min-w-[140px] md:flex-[1_1_180px]')}> 
               <div
                 className={clsx(
                   'flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors',
@@ -107,6 +108,7 @@ export function WorkflowTimeline({ currentStatus, compact = false }: WorkflowTim
             </div>
           )
         })}
+        </div>
       </div>
 
       {errors.length > 0 && (

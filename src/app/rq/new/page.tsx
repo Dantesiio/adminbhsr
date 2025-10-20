@@ -98,8 +98,8 @@ export default function NewRQPage() {
           </div>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+  <div className="grid gap-6 lg:grid-cols-[2fr_1fr] max-w-full overflow-x-hidden">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm min-w-0">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">Información de la solicitud</h2>
@@ -114,7 +114,7 @@ export default function NewRQPage() {
               </button>
             </div>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-6 min-w-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="projectId" className="block text-sm font-medium text-gray-700 mb-2">
@@ -203,8 +203,8 @@ export default function NewRQPage() {
               
               <div className="space-y-4">
                 {fields.map((field, idx) => (
-                  <div key={field.id} className="grid grid-cols-12 gap-3 p-4 border border-gray-200 rounded-lg">
-                    <div className="col-span-12 sm:col-span-4">
+                  <div key={field.id} className="grid grid-cols-12 gap-3 p-4 border border-gray-200 rounded-lg min-w-0">
+                    <div className="col-span-12 sm:col-span-4 min-w-0">
                       <label htmlFor={`${field.id}-name`} className="block text-xs font-medium text-gray-500 mb-1">
                         Nombre del Producto *
                       </label>
@@ -221,7 +221,7 @@ export default function NewRQPage() {
                       )}
                     </div>
                     
-                    <div className="col-span-12 sm:col-span-4">
+                    <div className="col-span-12 sm:col-span-4 min-w-0">
                       <label htmlFor={`${field.id}-spec`} className="block text-xs font-medium text-gray-500 mb-1">
                         Especificación
                       </label>
@@ -233,7 +233,7 @@ export default function NewRQPage() {
                       />
                     </div>
                     
-                    <div className="col-span-6 sm:col-span-2">
+                    <div className="col-span-6 sm:col-span-2 min-w-0">
                       <label htmlFor={`${field.id}-qty`} className="block text-xs font-medium text-gray-500 mb-1">
                         Cantidad *
                       </label>
@@ -252,7 +252,7 @@ export default function NewRQPage() {
                       )}
                     </div>
                     
-                    <div className="col-span-5 sm:col-span-1">
+                    <div className="col-span-5 sm:col-span-1 min-w-0">
                       <label htmlFor={`${field.id}-uom`} className="block text-xs font-medium text-gray-500 mb-1">
                         Unidad
                       </label>
@@ -304,8 +304,8 @@ export default function NewRQPage() {
             </div>
             </form>
           </div>
-          <aside className="space-y-4">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <aside className="space-y-4 min-w-0">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500">Flujo de aprobación</h3>
               <p className="mt-2 text-xs text-slate-500">
                 Tu requisición se enviará automáticamente a Compras. Desde allí se generarán cotizaciones, comparativos y autorizaciones según el flujo institucional.
@@ -314,7 +314,7 @@ export default function NewRQPage() {
                 <WorkflowTimeline currentStatus="ENVIADA_COMPRAS" compact />
               </div>
             </div>
-            <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 text-sm text-blue-900 shadow-sm">
+            <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5 sm:p-6 text-sm text-blue-900 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-widest text-blue-700">Tips rápidos</h3>
               <ul className="mt-3 space-y-2">
                 <li className="flex items-start gap-2">
