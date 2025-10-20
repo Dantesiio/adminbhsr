@@ -141,7 +141,7 @@ pnpm db:seed          # Poblar datos de prueba
 
 ```env
 # Base de datos (local con Docker)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5433/dondiego"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/adminbhsr"
 
 # NextAuth
 NEXTAUTH_SECRET="development-secret-change-in-production"
