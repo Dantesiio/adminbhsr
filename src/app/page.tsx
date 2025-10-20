@@ -4,15 +4,39 @@ import Layout from '@/components/Layout'
 import type { AppRole } from '@/lib/roles'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
 
-  const role = session?.user?.role || 'SOLICITANTE'
+  // Redirigir al login si no está autenticado
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
+
+  // Mostrar loading mientras se verifica la sesión
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Si no hay sesión, no mostrar nada (ya se redirigió)
+  if (!session?.user) {
+    return null
+  }
+
+  const role = session.user.role
   const appRoles: AppRole[] = ['SOLICITANTE', 'COMPRAS', 'AUTORIZADOR', 'ADMIN']
   const normalizedRole = appRoles.includes(role as AppRole) ? (role as AppRole) : 'SOLICITANTE'
 
