@@ -1,20 +1,74 @@
-# adminbhsr App - Sistema de Requisiciones Hospital San Rafael
+# 🏥 AdminBHSR - Sistema de Requisiciones Hospital San Rafael
 
-## MVP - Fase Beta
+[![Next.js](https://img.shields.io/badge/Next.js-14.2-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-6.15-2D3748)](https://www.prisma.io/)
 
-Este es un MVP (Producto Mínimo Viable) del sistema de requisiciones para el Hospital San Rafael, implementando el flujo completo desde la solicitud inicial hasta la gestión de órdenes de compra.
+Sistema integral de gestión de requisiciones para el Hospital San Rafael. Implementa el flujo completo desde la solicitud hasta la orden de compra, con control de roles y estados.
 
-## Arquitectura del Sistema
+---
 
-### Tecnologías Utilizadas
-- **Frontend**: Next.js 14 (App Router) + React + TypeScript
-- **Base de Datos**: Vercel Postgres + Prisma ORM
-- **Almacenamiento**: Vercel Blob (o S3 alternativo)
-- **Autenticación**: Auth.js (NextAuth v5) con roles RBAC
-- **Emails**: Resend
-- **PDFs**: @react-pdf/renderer
+## 🚀 Inicio Rápido
+
+### Prerrequisitos
+
+- **Node.js** 18+ ([Descargar](https://nodejs.org/))
+- **pnpm** ([Instalar](https://pnpm.io/installation)): `npm install -g pnpm`
+- **Docker** ([Descargar](https://www.docker.com/)) - para la base de datos local
+
+### Instalación
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/Dantesiio/adminbhsr.git
+cd adminbhsr
+
+# 2. Instalar dependencias
+pnpm install
+
+# 3. Configurar variables de entorno
+cp .env.example .env.local
+# Editar .env.local si es necesario (valores por defecto funcionan para desarrollo)
+```
+
+### Iniciar el Proyecto (Desarrollo)
+
+```bash
+# 1. Iniciar la base de datos (PostgreSQL en Docker)
+./scripts/start-db.sh
+
+# 2. Configurar la base de datos (primera vez solamente)
+pnpm db:generate    # Generar cliente Prisma
+pnpm db:push        # Crear tablas en la BD
+pnpm db:seed        # Poblar datos de prueba
+
+# 3. Iniciar el servidor de desarrollo
+pnpm dev
+```
+
+🎉 **Listo!** Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+
+### Usuarios de Prueba (después del seed)
+
+| Email | Contraseña | Rol |
+|-------|-----------|-----|
+| `solicitante@hospital.com` | `password123` | SOLICITANTE |
+| `compras@hospital.com` | `password123` | COMPRAS |
+| `autorizador@hospital.com` | `password123` | AUTORIZADOR |
+| `admin@hospital.com` | `password123` | ADMIN |
+
+---
+
+## 🛠️ Tecnologías Principales
+
+- **Frontend**: Next.js 14 (App Router) + React 18 + TypeScript
+- **Base de Datos**: PostgreSQL + Prisma ORM
+- **Autenticación**: NextAuth v5 con roles RBAC
 - **Estilos**: Tailwind CSS
 - **Formularios**: React Hook Form + Zod
+- **PDFs**: @react-pdf/renderer
+- **Emails**: Resend
+- **Storage**: Vercel Blob
 
 ### Estructura del Flujo de Trabajo
 
@@ -62,81 +116,237 @@ Este es un MVP (Producto Mínimo Viable) del sistema de requisiciones para el Ho
 7. **OC_EMITIDA** - Orden de compra emitida
 8. **CERRADA** - Proceso completado
 
-## Instalación y Configuración
+## 📦 Scripts Disponibles
 
-### Prerrequisitos
-- Node.js 18+
-- Vercel Postgres (o PostgreSQL local)
-- Vercel Blob (o S3)
-- pnpm (recomendado)
-
-### Pasos de Instalación
-
-1. **Clonar e instalar dependencias**
 ```bash
-git clone <repository>
-cd adminbhsr
+# Desarrollo
+pnpm dev              # Iniciar servidor de desarrollo (puerto 3000)
+pnpm build            # Crear build de producción
+pnpm start            # Iniciar servidor de producción
+pnpm lint             # Ejecutar ESLint
+
+# Base de datos
+pnpm db:generate      # Generar cliente Prisma
+pnpm db:push          # Sincronizar schema con la BD
+pnpm db:seed          # Poblar datos de prueba
+
+# Docker (Base de datos)
+./scripts/start-db.sh  # Iniciar PostgreSQL en Docker
+./scripts/stop-db.sh   # Detener PostgreSQL
+```
+
+## 🔧 Configuración Avanzada
+
+### Variables de Entorno (`.env.local`)
+
+```env
+# Base de datos (local con Docker)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/dondiego"
+
+# NextAuth
+NEXTAUTH_SECRET="development-secret-change-in-production"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Vercel Blob (opcional para desarrollo)
+BLOB_READ_WRITE_TOKEN="tu_token_aqui"
+
+# Resend (opcional para desarrollo)
+RESEND_API_KEY="tu_api_key_aqui"
+```
+
+### Gestión de Base de Datos
+
+```bash
+# Ver los datos en Prisma Studio
+npx prisma studio
+
+# Resetear la base de datos (¡CUIDADO! Borra todos los datos)
+pnpm db:push --force-reset
+pnpm db:seed
+
+# Crear nueva migración
+npx prisma migrate dev --name nombre_migracion
+```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+adminbhsr/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── api/               # API Routes
+│   │   ├── dashboard/         # Dashboard por rol
+│   │   ├── login/             # Página de login
+│   │   ├── rq/                # Gestión de requisiciones
+│   │   │   ├── new/           # Crear RQ
+│   │   │   ├── [id]/          # Ver/Editar RQ
+│   │   │   │   ├── quotes/    # Cotizaciones
+│   │   │   │   └── approve/   # Autorización
+│   │   ├── projects/          # Proyectos
+│   │   ├── cost-centers/      # Centros de costo
+│   │   └── suppliers/         # Proveedores
+│   ├── components/            # Componentes React
+│   │   ├── Layout.tsx         # Layout principal
+│   │   └── WorkflowTimeline.tsx
+│   ├── lib/                   # Utilidades
+│   │   ├── auth.ts            # Configuración NextAuth
+│   │   ├── prisma.ts          # Cliente Prisma
+│   │   └── roles.ts           # Definición de roles
+│   └── types/                 # Tipos TypeScript
+├── prisma/
+│   ├── schema.prisma          # Esquema de la BD
+│   └── seed.ts                # Datos de prueba
+├── scripts/
+│   ├── start-db.sh            # Iniciar BD en Docker
+│   └── stop-db.sh             # Detener BD
+└── middleware.ts              # Protección de rutas
+```
+
+---
+
+## 🚀 Despliegue en Vercel
+
+### Configuración
+
+1. **Fork/Push el repositorio a GitHub**
+2. **Ir a [Vercel](https://vercel.com) y crear nuevo proyecto**
+3. **Conectar con el repositorio**
+4. **Configurar variables de entorno:**
+   - `DATABASE_URL` - desde Vercel Postgres
+   - `NEXTAUTH_SECRET` - generar con `openssl rand -base64 32`
+   - `NEXTAUTH_URL` - URL de producción
+   - `BLOB_READ_WRITE_TOKEN` - desde Vercel Blob
+
+5. **Agregar Vercel Postgres:**
+   - En el dashboard del proyecto → Storage → Create Database
+   - Seleccionar Postgres → Connect
+
+6. **Agregar Vercel Blob:**
+   - En el dashboard del proyecto → Storage → Create Store
+   - Seleccionar Blob → Connect
+
+7. **Desplegar:**
+   ```bash
+   git push origin main
+   ```
+
+### Primera ejecución en producción
+
+Después del primer deploy, ejecutar el seed:
+```bash
+vercel env pull .env.local
+pnpm db:seed
+```
+
+---
+
+## 🔐 Sistema de Roles y Permisos
+
+| Rol | Permisos |
+|-----|----------|
+| **SOLICITANTE** | Crear RQs, ver sus propias requisiciones |
+| **COMPRAS** | Gestionar cotizaciones, crear comparativos |
+| **AUTORIZADOR** | Aprobar/rechazar RQs con comparativo |
+| **LOGISTICA** | Crear órdenes de compra (en desarrollo) |
+| **TESORERIA** | Gestión de pagos (en desarrollo) |
+| **ADMIN** | Acceso total al sistema |
+
+---
+
+## 🎯 Flujo de Trabajo del Sistema
+
+### 1️⃣ **Solicitante** crea RQ
+- Llenar formulario con proyecto, centro de costo e ítems
+- Enviar a compras
+
+### 2️⃣ **Compras** gestiona cotizaciones
+- Solicitar cotizaciones a proveedores
+- Cargar respuestas recibidas
+- Crear comparativo con 2+ cotizaciones
+- Enviar a autorización
+
+### 3️⃣ **Autorizador** revisa y aprueba
+- Revisar comparativo
+- Completar lista de verificación
+- Aprobar o rechazar
+
+### 4️⃣ **Logística** genera OC (próximamente)
+- Crear orden de compra
+- Gestionar recepción
+
+---
+
+## 🐛 Solución de Problemas
+
+### La base de datos no conecta
+
+```bash
+# Verificar que Docker esté corriendo
+docker ps
+
+# Reiniciar la base de datos
+./scripts/stop-db.sh
+./scripts/start-db.sh
+
+# Verificar logs
+docker logs adminbhsr-postgres
+```
+
+### Error: "Module not found" o errores de TypeScript
+
+```bash
+# Limpiar y reinstalar
+rm -rf node_modules .next
 pnpm install
+pnpm db:generate
 ```
 
-2. **Configurar variables de entorno**
-```bash
-cp .env.example .env.local
-# Editar .env.local con:
-# - DATABASE_URL (Vercel Postgres)
-# - AUTH_SECRET (generar uno fuerte)
-# - BLOB_READ_WRITE_TOKEN (Vercel Blob)
-# - RESEND_API_KEY
-```
+### Problemas con el cache del navegador
 
-3. **Configurar base de datos**
-```bash
-pnpm prisma generate
-pnpm prisma db push
-pnpm prisma db seed
-```
+1. Abrir DevTools (F12)
+2. Click derecho en el botón Reload → "Empty Cache and Hard Reload"
+3. O usar modo incógnito: `Cmd+Shift+N`
 
-4. **Iniciar servidor de desarrollo**
-```bash
-pnpm dev
-```
+---
 
-### Despliegue en Vercel
+## 📝 Próximas Funcionalidades
 
-1. Conectar repositorio a Vercel
-2. Configurar variables de entorno en Vercel Dashboard
-3. Vincular Vercel Postgres y Blob
-4. Desplegar
+- [ ] Módulo de Órdenes de Compra
+- [ ] Gestión de recepción de productos
+- [ ] Módulo de pagos (Tesorería)
+- [ ] Reportes y analytics
+- [ ] Notificaciones por email
+- [ ] Historial de cambios (audit log)
+- [ ] Exportación a Excel
+- [ ] Dashboard con gráficas
 
-## Uso del Sistema
+---
 
-### Navegación por Roles
+## 🤝 Contribuir
 
-La aplicación está diseñada para funcionar con diferentes roles. Puedes cambiar de rol usando el selector en la barra de navegación.
+Las contribuciones son bienvenidas. Por favor:
 
-#### Como Solicitante:
-1. Ir a "Nueva RQ"
-2. Llenar formulario con proyecto, ítems requeridos
-3. Enviar requisición
-4. Hacer seguimiento en "Mis Requisiciones"
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
-#### Como Compras:
-1. Ver "RQs Pendientes" en dashboard
-2. Hacer clic en "Gestionar Cotizaciones"
-3. Solicitar cotizaciones a proveedores
-4. Una vez con 2+ cotizaciones, crear comparativo
-5. Enviar a autorización
+---
 
-#### Como Autorizador:
-1. Ver "Pendientes Autorización" en dashboard
-2. Hacer clic en "Revisar" para cada RQ
-3. Revisar comparativo y completar lista de verificación
-4. Aprobar o rechazar con comentarios
+## 📄 Licencia
 
-### Datos de Prueba
+Proyecto privado - Hospital San Rafael
 
-El sistema incluye datos de prueba:
-- **Usuarios**: Un usuario por cada rol
+---
+
+## 👥 Contacto
+
+**Equipo de Desarrollo**
+- GitHub: [@Dantesiio](https://github.com/Dantesiio)
+- Proyecto: [AdminBHSR](https://github.com/Dantesiio/adminbhsr)
 - **Proyectos**: ECHO Bolsas, ECHO 731, Mensajería
 - **Centros de Costo**: Operaciones, Logística, Administración
 - **RQ de Ejemplo**: RQ-0001 con ítems de bolsas
