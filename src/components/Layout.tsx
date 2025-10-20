@@ -51,10 +51,10 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-gradient-to-r from-slate-900 via-blue-900 to-blue-700 pb-4 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 pt-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-slate-900 via-blue-900 to-blue-700 pb-4 shadow-lg">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex flex-col gap-4 pt-4 sm:pt-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3">
                 <Link href="/" className="text-2xl font-bold text-white tracking-tight">
                   AdminBHSR
@@ -63,7 +63,7 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
                   {normalizedRole}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div className="flex flex-col text-xs font-medium text-blue-100">
                   <span className="mb-1 uppercase tracking-widest text-[11px] text-blue-100/80">
                     Rol activo
@@ -88,7 +88,7 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
               </div>
             </div>
 
-            <nav className="flex flex-wrap items-center gap-2 text-sm">
+            <nav className="flex items-center gap-2 overflow-x-auto pb-1 text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {links.map((link) => {
                 const isActive = pathname === link.href
                 return (
