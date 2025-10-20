@@ -6,7 +6,7 @@
 CONTAINER_NAME="adminbhsr-postgres"
 POSTGRES_PASSWORD="postgres"
 POSTGRES_USER="postgres"
-POSTGRES_DB="dondiego"
+POSTGRES_DB="adminbhsr"
 POSTGRES_PORT="5433"
 
 echo "🚀 Iniciando PostgreSQL para AdminBHSR..."
