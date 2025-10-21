@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { getRoleGuidance } from '@/lib/workflow'
 import type { AppRole } from '@/lib/roles'
-import logoHorizontal from '@/lib/images/logobhsr.png'
+import logoHorizontal from '@/lib/images/logo.svg.jpeg'
 
 interface LayoutProps {
   readonly children: ReactNode
