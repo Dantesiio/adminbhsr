@@ -31,13 +31,13 @@ export function WorkflowTimeline({ currentStatus, compact = false }: WorkflowTim
     <div className={clsx('space-y-4', compact && 'space-y-2')}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-700">Flujo del proceso</p>
-          <p className="text-xs text-gray-500">
-            {currentStatus ? `Estado actual: ${currentStatus.replace(/_/g, ' ')}` : 'Sin estado asignado'}
+          <p className="text-sm font-semibold text-brand-plum">Flujo del proceso</p>
+          <p className="text-xs text-brand-plum/60">
+            {currentStatus ? `Estado actual: ${currentStatus.replaceAll('_', ' ')}` : 'Sin estado asignado'}
           </p>
         </div>
         {errors.length === 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-magenta/15 px-2 py-1 text-xs font-medium text-brand-magentaDark">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -70,31 +70,31 @@ export function WorkflowTimeline({ currentStatus, compact = false }: WorkflowTim
               <div
                 className={clsx(
                   'flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors',
-                  isActive && 'border-blue-500 bg-blue-50 text-blue-900 shadow',
-                  isCompleted && !isActive && 'border-green-500 bg-green-50 text-green-900',
-                  !isActive && !isCompleted && 'border-gray-200 bg-white text-gray-600'
+                  isActive && 'border-brand-magenta bg-white text-brand-magentaDark shadow-brandSoft',
+                  isCompleted && !isActive && 'border-brand-magenta/50 bg-brand-magenta/10 text-brand-magentaDark',
+                  !isActive && !isCompleted && 'border-brand-magenta/10 bg-white text-brand-plum/65'
                 )}
               >
                 <div
                   className={clsx(
                     'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold',
-                    isActive && 'border-blue-500 bg-blue-100 text-blue-700',
-                    isCompleted && !isActive && 'border-green-500 bg-green-100 text-green-700',
-                    !isActive && !isCompleted && 'border-gray-200 bg-gray-100 text-gray-500'
+                    isActive && 'border-brand-magenta bg-brand-magenta/15 text-brand-magentaDark',
+                    isCompleted && !isActive && 'border-brand-magenta/40 bg-brand-magenta/10 text-brand-magentaDark',
+                    !isActive && !isCompleted && 'border-brand-magenta/15 bg-brand-magenta/5 text-brand-plum/60'
                   )}
                 >
                   {index + 1}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold uppercase tracking-wider">
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-plum">
                     {stage.label}
                   </span>
-                  <span className="text-[11px] text-gray-500">
+                  <span className="text-[11px] text-brand-plum/60">
                     {stage.actor}
                   </span>
                 </div>
               </div>
-              <p className={clsx('mt-2 text-xs leading-relaxed text-gray-500', compact && 'hidden md:block')}>
+              <p className={clsx('mt-2 text-xs leading-relaxed text-brand-plum/60', compact && 'hidden md:block')}>
                 {stage.description}
               </p>
               {rejected && status === 'EN_AUTORIZACION' && (

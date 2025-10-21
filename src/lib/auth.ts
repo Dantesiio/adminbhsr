@@ -4,7 +4,18 @@ import { compare } from 'bcryptjs'
 import { prisma } from './prisma'
 import { Role } from '@prisma/client'
 
+const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET
+
+const trustHostEnv = process.env.AUTH_TRUST_HOST
+const trustHost =
+  trustHostEnv === 'true' ||
+  trustHostEnv === '1' ||
+  Boolean(process.env.VERCEL) ||
+  process.env.NODE_ENV !== 'production'
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret,
+  trustHost,
   providers: [
     Credentials({
       name: 'credentials',
@@ -64,4 +75,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
     strategy: 'jwt',
   },
+  debug: process.env.NODE_ENV === 'development',
 })

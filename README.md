@@ -52,10 +52,10 @@ pnpm dev
 
 | Email | Contraseña | Rol |
 |-------|-----------|-----|
-| `solicitante@hospital.com` | `password123` | SOLICITANTE |
-| `compras@hospital.com` | `password123` | COMPRAS |
-| `autorizador@hospital.com` | `password123` | AUTORIZADOR |
-| `admin@hospital.com` | `password123` | ADMIN |
+| `prueba@solicitante.com` | `prueba123` | SOLICITANTE |
+| `prueba@compras.com` | `prueba123` | COMPRAS |
+| `prueba@autorizador.com` | `prueba123` | AUTORIZADOR |
+| `prueba@admin.com` | `prueba123` | ADMIN |
 
 ---
 
@@ -140,12 +140,17 @@ pnpm db:seed          # Poblar datos de prueba
 ### Variables de Entorno (`.env.local`)
 
 ```env
-# Base de datos (local con Docker)
+# Opción A: Docker local
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/adminbhsr"
 
-# NextAuth
-NEXTAUTH_SECRET="development-secret-change-in-production"
-NEXTAUTH_URL="http://localhost:3000"
+# Opción B: Vercel Postgres (usar "Prisma" en runtime y "Direct" para migraciones)
+# DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require&pgbouncer=true&connection_limit=1"
+# DIRECT_DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+
+# Auth.js
+AUTH_SECRET="development-secret-change-in-production"
+AUTH_URL="http://localhost:3000"
+AUTH_TRUST_HOST="true"
 
 # Vercel Blob (opcional para desarrollo)
 BLOB_READ_WRITE_TOKEN="tu_token_aqui"
@@ -166,6 +171,24 @@ pnpm db:seed
 
 # Crear nueva migración
 npx prisma migrate dev --name nombre_migracion
+```
+
+### Cambiar rápido entre Docker y Vercel (dev)
+
+Están incluidos dos archivos de entorno y un script helper:
+
+- `.env.local.docker` → apuntando a Docker local (puerto 5433)
+- `.env.local.vercel` → plantilla para Vercel Postgres (incluye DIRECT_DATABASE_URL)
+- `scripts/use-env.sh` → copia uno de los anteriores a `.env.local`
+
+Comandos útiles:
+
+```bash
+pnpm use:docker     # usa Docker local
+pnpm use:vercel     # usa Vercel Postgres
+
+pnpm dev:docker     # cambia a Docker y arranca dev
+pnpm dev:vercel     # cambia a Vercel y arranca dev
 ```
 
 ---
@@ -215,8 +238,9 @@ adminbhsr/
 3. **Conectar con el repositorio**
 4. **Configurar variables de entorno:**
    - `DATABASE_URL` - desde Vercel Postgres
-   - `NEXTAUTH_SECRET` - generar con `openssl rand -base64 32`
-   - `NEXTAUTH_URL` - URL de producción
+   - `AUTH_SECRET` - generar con `openssl rand -base64 32`
+   - `AUTH_URL` - URL de producción
+   - `AUTH_TRUST_HOST` - define `true` en Vercel para confiar en el dominio auto-generado
    - `BLOB_READ_WRITE_TOKEN` - desde Vercel Blob
 
 5. **Agregar Vercel Postgres:**

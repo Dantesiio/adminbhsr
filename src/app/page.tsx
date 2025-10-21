@@ -47,14 +47,14 @@ export default function Home() {
         description: 'Crear nuevas requisiciones',
         href: '/rq/new',
         buttonText: 'Crear RQ',
-        color: 'bg-blue-600 hover:bg-blue-700',
+        color: 'bg-brand-magenta hover:bg-brand-magentaDark',
       },
       {
         title: 'Mis Requisiciones',
         description: 'Seguimiento de solicitudes existentes',
         href: '/dashboard?role=SOLICITANTE',
         buttonText: 'Ver Dashboard',
-        color: 'bg-gray-600 hover:bg-gray-700',
+        color: 'bg-brand-purple hover:bg-brand-magentaDark',
       },
     ],
     COMPRAS: [
@@ -63,7 +63,7 @@ export default function Home() {
         description: 'Gestionar cotizaciones y comparativos',
         href: '/dashboard?role=COMPRAS',
         buttonText: 'Ver Pendientes',
-        color: 'bg-green-600 hover:bg-green-700',
+        color: 'bg-brand-magenta hover:bg-brand-magentaDark',
       },
     ],
     AUTORIZADOR: [
@@ -72,7 +72,7 @@ export default function Home() {
         description: 'Revisar y autorizar requisiciones',
         href: '/dashboard?role=AUTORIZADOR',
         buttonText: 'Ver Pendientes',
-        color: 'bg-orange-600 hover:bg-orange-700',
+        color: 'bg-brand-magenta hover:bg-brand-magentaDark',
       },
     ],
     ADMIN: [
@@ -81,7 +81,7 @@ export default function Home() {
         description: 'Configuración del sistema',
         href: '/dashboard?role=ADMIN',
         buttonText: 'Ver Dashboard',
-        color: 'bg-red-600 hover:bg-red-700',
+        color: 'bg-brand-magenta hover:bg-brand-magentaDark',
       },
     ],
   }
@@ -97,27 +97,27 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="min-h-[70vh] bg-slate-100">
+      <div className="min-h-[70vh] bg-[#fefbfe]">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-16 sm:px-6 lg:px-8">
           <section className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr]">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-blue-600 p-10 text-white shadow-xl">
+            <div className="relative overflow-hidden rounded-3xl bg-brand-gradient p-10 text-white shadow-xl shadow-brand">
               <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute -bottom-32 -left-8 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+              <div className="absolute -bottom-32 -left-8 h-64 w-64 rounded-full bg-white/15 blur-3xl" />
               <div className="relative z-10 max-w-xl space-y-6">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-blue-100">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/85">
                   Hospital San Rafael
                 </span>
                 <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
                   Plataforma integral para requisiciones digitales
                 </h1>
-                <p className="text-base text-blue-100 sm:text-lg">
+                <p className="text-base text-white/85 sm:text-lg">
                   Coordina solicitudes, cotizaciones, aprobaciones y órdenes de compra desde un mismo lugar.
                   Visualiza el estado real de cada RQ y comunica a los equipos con claridad.
                 </p>
                 <div className="flex flex-wrap gap-3 sm:gap-4">
                   <Link
                     href="/rq/new"
-                    className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-blue-900 shadow-lg shadow-blue-900/20 transition hover:-translate-y-0.5 hover:bg-blue-50"
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-brand-magentaDark shadow-lg shadow-brandSoft transition hover:-translate-y-0.5 hover:bg-brand-magenta/10"
                   >
                     Registrar RQ
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -126,7 +126,7 @@ export default function Home() {
                   </Link>
                   <Link
                     href="/dashboard"
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/10"
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-5 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/15"
                   >
                     Ver tablero
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -165,9 +165,9 @@ export default function Home() {
                 </h2>
                 <div className="mt-6 flex flex-wrap gap-4">
                   {[
-                    { label: 'RQ activas', value: '12', trend: '+3', color: 'bg-blue-100 text-blue-600' },
-                    { label: 'En comparación', value: '4', trend: '+1', color: 'bg-yellow-100 text-yellow-600' },
-                    { label: 'Pendientes de aprobación', value: '2', trend: '-1', color: 'bg-orange-100 text-orange-600' },
+                    { label: 'RQ activas', value: '12', trend: '+3', color: 'bg-brand-magenta/10 text-brand-magentaDark' },
+                    { label: 'En comparación', value: '4', trend: '+1', color: 'bg-brand-magenta/15 text-brand-purple' },
+                    { label: 'Pendientes de aprobación', value: '2', trend: '-1', color: 'bg-red-100 text-red-600' },
                   ].map((item) => (
                     <div key={item.label} className="min-w-[120px] flex-1 rounded-2xl bg-slate-50 p-4 text-sm">
                       <p className="text-xs font-medium text-slate-500">{item.label}</p>
@@ -205,12 +205,12 @@ export default function Home() {
                       placeholder="Buscar por código RQ/OC..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full rounded-xl border border-brand-magenta/20 bg-white py-3 pl-10 pr-4 text-sm shadow-sm focus:border-brand-magenta focus:outline-none focus:ring-2 focus:ring-brand-magenta/30"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 sm:px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
+                    className="inline-flex items-center justify-center rounded-xl bg-brand-magenta px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brandSoft transition hover:-translate-y-0.5 hover:bg-brand-magentaDark"
                   >
                     Buscar
                   </button>
@@ -282,11 +282,11 @@ export default function Home() {
             </div>
           </section>
 
-          <footer className="rounded-3xl border border-dashed border-slate-300 bg-white/80 p-6 sm:p-8 text-center text-sm text-slate-500">
-            <p className="font-medium text-slate-600">
+          <footer className="rounded-3xl border border-dashed border-brand-magenta/30 bg-white/85 p-6 sm:p-8 text-center text-sm text-brand-plum/70">
+            <p className="font-medium text-brand-plum">
               Hospital San Rafael · AdminBHSR — Versión Beta
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-brand-plum/50">
               Desarrollado con Next.js, Prisma y Tailwind CSS para acelerar la gestión de requisiciones.
             </p>
           </footer>

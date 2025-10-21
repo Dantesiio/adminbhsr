@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { ReactNode, Suspense, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { getRoleGuidance } from '@/lib/workflow'
 import type { AppRole } from '@/lib/roles'
+import logoHorizontal from '@/lib/images/logobhsr.png'
 
 interface LayoutProps {
   readonly children: ReactNode
@@ -50,35 +52,44 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
   const guidance = useMemo(() => getRoleGuidance(normalizedRole), [normalizedRole])
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-slate-900 via-blue-900 to-blue-700 pb-4 shadow-lg">
+  <div className="min-h-screen bg-[#fefbfe] overflow-x-hidden">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-brand-magenta via-brand-magentaDark to-brand-purple pb-4 shadow-lg shadow-brand">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
           <div className="flex flex-col gap-4 pt-4 sm:pt-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
-              <div className="flex items-center gap-3">
-                <Link href="/" className="text-2xl font-bold text-white tracking-tight">
-                  AdminBHSR
+            <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <Link href="/" className="group inline-flex items-center gap-3 text-white">
+                  <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/15 p-1 shadow-brandSoft transition group-hover:bg-white/20">
+                    <Image
+                      src={logoHorizontal}
+                      alt="Barco Hospital San Raffaele"
+                      className="h-full w-full object-contain"
+                      priority
+                      sizes="40px"
+                    />
+                  </span>
+                  <span className="text-2xl font-semibold tracking-tight text-white">
+                    AdminBHSR
+                  </span>
                 </Link>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-blue-100 backdrop-blur">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-white/85 backdrop-blur">
                   {normalizedRole}
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-                <div className="flex flex-col text-xs font-medium text-blue-100">
-                  <span className="mb-1 uppercase tracking-widest text-[11px] text-blue-100/80">
-                    Rol activo
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+              <div className="flex min-w-0 flex-wrap items-center gap-3 text-white/85 sm:gap-4">
+                <div className="flex flex-col text-[11px] font-semibold uppercase tracking-[0.28em] text-white/70">
+                  <span className="mb-1">Rol activo</span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white">
                     {normalizedRole}
                   </span>
                 </div>
-                <div className="hidden md:block h-4 w-px bg-white/20" />
-                <span className="text-xs font-medium text-blue-100">
+                <div className="hidden h-4 w-px bg-white/25 md:block" />
+                <span className="text-xs font-medium text-white">
                   {session?.user?.name || session?.user?.email}
                 </span>
                 <button
                   onClick={() => signOut({ callbackUrl: '/login' })}
-                  className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/20"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12H3m12 0l-4 4m4-4l-4-4m9 8V8a2 2 0 00-2-2h-3" />
@@ -88,7 +99,7 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
               </div>
             </div>
 
-            <nav className="flex w-full items-center gap-2 overflow-x-auto pb-1 text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav className="flex w-full items-center gap-2 overflow-x-auto pb-1 text-sm text-white/80 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {links.map((link) => {
                 const isActive = pathname === link.href
                 return (
@@ -97,8 +108,8 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
                     href={link.href}
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                       isActive
-                        ? 'border-white bg-white text-blue-900 shadow-sm'
-                        : 'border-white/20 bg-white/10 text-blue-50 hover:bg-white/20'
+                        ? 'border-white bg-white text-brand-magentaDark shadow-sm'
+                        : 'border-white/20 bg-white/10 text-white/85 hover:bg-white/20'
                     }`}
                   >
                     {link.label}
@@ -108,10 +119,10 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
             </nav>
 
             {guidance.length > 0 && (
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4 text-blue-50">
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4 text-white/85">
                 <div className="flex items-start justify-between gap-4 min-w-0">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-100">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
                       Guía rápida del rol
                     </p>
                     <h2 className="mt-1 text-base font-semibold text-white">
@@ -134,10 +145,10 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
                   </button>
                 </div>
                 {showGuidance && (
-                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-blue-50">
+                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-white/90">
                     {guidance.map((tip) => (
                       <li key={tip} className="flex items-start gap-2">
-                        <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         <span>{tip}</span>
@@ -150,9 +161,9 @@ function LayoutShell({ children, currentRole: propRole }: LayoutProps) {
           </div>
         </div>
       </header>
-  <main className="relative pt-6 pb-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border border-white/40 bg-white/90 p-6 shadow-xl backdrop-blur">
+      <main className="relative pt-8 pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-brand-magenta/15 bg-white/95 p-6 shadow-xl shadow-brandSoft backdrop-blur">
             {children}
           </div>
         </div>
@@ -165,10 +176,10 @@ export default function Layout(props: LayoutProps) {
   return (
     <Suspense
       fallback={(
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+  <div className="flex min-h-screen items-center justify-center bg-[#fefbfe]">
           <div className="space-y-2 text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Cargando interfaz</p>
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-brand-magenta border-t-transparent" />
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-plum/70">Cargando interfaz</p>
           </div>
         </div>
       )}

@@ -10,7 +10,11 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push",
 		"db:seed": "tsx prisma/seed.ts",
-		"postinstall": "prisma generate"
+		"postinstall": "prisma generate",
+		"use:docker": "bash ./scripts/use-env.sh docker",
+		"use:vercel": "bash ./scripts/use-env.sh vercel",
+		"dev:docker": "bash ./scripts/use-env.sh docker && next dev",
+		"dev:vercel": "bash ./scripts/use-env.sh vercel && next dev"
 	},
 	"dependencies": {
 		"@auth/prisma-adapter": "^2.10.0",
