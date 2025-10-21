@@ -1,15 +1,15 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Providers } from '@/components/Providers'
-import logoHorizontal from '@/lib/images/logo.png'
+import logoBHSR from '@/lib/images/logobhsr.png'
 
 export const metadata: Metadata = {
   title: 'AdminBHSR',
   description: 'AdminBHSR · Plataforma integral de requisiciones del Hospital San Rafael.',
   icons: {
     icon: [
-      { url: logoHorizontal.src, rel: 'icon', type: 'image/png' },
-      { url: logoHorizontal.src, sizes: '192x192', type: 'image/png' },
+  { url: logoBHSR.src, rel: 'icon', type: 'image/png' },
+  { url: logoBHSR.src, sizes: '192x192', type: 'image/png' },
     ],
   },
 }
