@@ -44,22 +44,26 @@ async function main() {
   const requester = await prisma.user.findFirst({ where: { email: 'prueba@solicitante.com' } })
   const prj = await prisma.project.findFirst({ where: { code: 'PRJ-001' } })
   if (requester && prj) {
-    await prisma.rQ.create({
-      data: {
-        code: 'RQ-0001',
-        title: 'Compra de bolsas',
-        description: 'Bolsas para proyecto ECHO',
-        projectId: prj.id,
-        requesterId: requester.id,
-        status: 'ENVIADA_COMPRAS',
-        items: {
-          create: [
-            { name: 'Bolsa 20x30', spec: 'Polietileno', qty: 1000 as any, uom: 'unidad' },
-            { name: 'Bolsa 30x40', spec: 'Polietileno', qty: 500 as any, uom: 'unidad' },
-          ],
+    // Check if RQ already exists
+    const existingRQ = await prisma.rQ.findUnique({ where: { code: 'RQ-0001' } })
+    if (!existingRQ) {
+      await prisma.rQ.create({
+        data: {
+          code: 'RQ-0001',
+          title: 'Compra de bolsas',
+          description: 'Bolsas para proyecto ECHO',
+          projectId: prj.id,
+          requesterId: requester.id,
+          status: 'ENVIADA_COMPRAS',
+          items: {
+            create: [
+              { name: 'Bolsa 20x30', spec: 'Polietileno', qty: 1000 as any, uom: 'unidad' },
+              { name: 'Bolsa 30x40', spec: 'Polietileno', qty: 500 as any, uom: 'unidad' },
+            ],
+          },
         },
-      },
-    })
+      })
+    }
   }
 }
 

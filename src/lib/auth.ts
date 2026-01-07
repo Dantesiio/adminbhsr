@@ -31,25 +31,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string
         const password = credentials.password as string
 
-        const user = await prisma.user.findUnique({
-          where: { email }
-        })
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email }
+          })
 
-        if (!user?.passwordHash) {
-          return null
-        }
+          if (!user?.passwordHash) {
+            console.error('[Auth] User not found or no password:', email)
+            return null
+          }
 
-        const isPasswordValid = await compare(password, user.passwordHash)
+          const isPasswordValid = await compare(password, user.passwordHash)
 
-        if (!isPasswordValid) {
-          return null
-        }
+          if (!isPasswordValid) {
+            console.error('[Auth] Invalid password for user:', email)
+            return null
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          }
+        } catch (error) {
+          console.error('[Auth] Database error:', error)
+          throw error
         }
       }
     })
@@ -75,5 +82,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
     strategy: 'jwt',
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Habilitado temporalmente para debug en producción
 })
