@@ -3,277 +3,381 @@ import Layout from '@/components/Layout'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { WorkflowTimeline } from '@/components/WorkflowTimeline'
-import { getStageByStatus, workflowStages } from '@/lib/workflow'
+import { getStageByStatus } from '@/lib/workflow'
 
 interface PageProps {
   params: { id: string }
   searchParams: { role?: string }
 }
 
-export default async function RQDetailPage({ params, searchParams }: PageProps) {
-  const rq = await prisma.rQ.findUnique({
-    where: { id: params.id },
-    include: {
-      items: true,
-      project: true,
-      costCenter: true,
-      requester: true,
-      quotes: {
-        include: {
-          supplier: true,
-          items: true,
-        },
-      },
-      comparison: {
-        include: {
-          chosen: true,
-        },
-      },
-      approvals: true,
-      po: {
-        include: {
-          supplier: true,
-        },
-      },
-    },
-  })
+// ─── Status badge config ──────────────────────────────────────────────────────
 
-  if (!rq) {
-    notFound()
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  DRAFT:             { label: 'Borrador',     className: 'bg-gray-100 text-gray-600' },
+  ENVIADA_COMPRAS:   { label: 'En Compras',   className: 'bg-blue-100 text-blue-700' },
+  EN_COMPARATIVO:    { label: 'Comparativo',  className: 'bg-yellow-100 text-yellow-700' },
+  EN_AUTORIZACION:   { label: 'Autorización', className: 'bg-orange-100 text-orange-700' },
+  APROBADA:          { label: 'Aprobada',     className: 'bg-green-100 text-green-700' },
+  OC_EMITIDA:        { label: 'OC Emitida',   className: 'bg-teal-100 text-teal-700' },
+  EN_RECEPCION:      { label: 'En Recepción', className: 'bg-indigo-100 text-indigo-700' },
+  CERRADA:           { label: 'Cerrada',      className: 'bg-gray-200 text-gray-600' },
+  RECHAZADA:         { label: 'Rechazada',    className: 'bg-red-100 text-red-700' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? { label: status, className: 'bg-gray-100 text-gray-600' }
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${cfg.className}`}>
+      <span className="h-2 w-2 rounded-full bg-current opacity-70" />
+      {cfg.label}
+    </span>
+  )
+}
+
+// ─── Section wrapper ──────────────────────────────────────────────────────────
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-6 py-4">
+        <h2 className="font-semibold text-brand-plum">{title}</h2>
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
+// ─── Info grid item ───────────────────────────────────────────────────────────
+
+function InfoItem({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{value || '—'}</dd>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function RQDetailPage({ params, searchParams }: PageProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rq: any = null
+  try {
+    rq = await prisma.rQ.findUnique({
+      where: { id: params.id },
+      include: {
+        items: true,
+        project: true,
+        costCenter: true,
+        requester: true,
+        quotes: { include: { supplier: true, items: true } },
+        comparison: { include: { chosen: true } },
+        approvals: { include: { approver: true }, orderBy: { createdAt: 'desc' } },
+        po: { include: { supplier: true } },
+        receipts: { orderBy: { createdAt: 'desc' } },
+      },
+    })
+  } catch {
+    // DB not available
   }
 
-  const role = searchParams.role?.toUpperCase() || 'USER'
+  if (!rq) notFound()
+
+  const role = (searchParams.role?.toUpperCase() || 'USER') as string
   const stage = getStageByStatus(rq.status)
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      DRAFT: 'bg-gray-100 text-gray-800',
-      ENVIADA_COMPRAS: 'bg-blue-100 text-blue-800',
-      EN_COMPARATIVO: 'bg-yellow-100 text-yellow-800',
-      EN_AUTORIZACION: 'bg-orange-100 text-orange-800',
-      APROBADA: 'bg-green-100 text-green-800',
-      RECHAZADA: 'bg-red-100 text-red-800',
-      OC_EMITIDA: 'bg-purple-100 text-purple-800',
-      EN_RECEPCION: 'bg-indigo-100 text-indigo-800',
-      CERRADA: 'bg-gray-100 text-gray-800',
-    }
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'
+  // Parse unit price from spec (stored as "Precio unitario: $XX,XXX · ...")
+  function parsePrice(spec?: string | null): number {
+    if (!spec) return 0
+    const m = spec.match(/Precio unitario:\s*\$([\d.,]+)/i)
+    if (!m) return 0
+    return parseFloat(m[1].replace(/\./g, '').replace(',', '.')) || 0
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalEstimado = rq.items.reduce((acc: number, item: any) => {
+    const price = parsePrice(item.spec)
+    return acc + price * Number(item.qty)
+  }, 0)
+
+  const formatCOP = (v: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
 
   return (
     <Layout currentRole={role}>
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">RQ</span>
-                <span className="text-xs font-semibold text-slate-500">{rq.code}</span>
-              </div>
-              <h1 className="mt-1 text-3xl font-bold text-slate-900">{rq.title}</h1>
-              <p className="mt-1 text-sm text-slate-500">Creada el {new Date(rq.createdAt).toLocaleDateString('es-CO')}</p>
+      <div className="space-y-6">
+
+        {/* ── RQ Header ── */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-magenta via-brand-magentaDark to-brand-purple p-7 text-white shadow-xl shadow-brand-magenta/20">
+          <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+          <div className="absolute -bottom-8 left-20 h-24 w-24 rounded-full bg-white/5" />
+          <div className="relative">
+            {/* Code + status */}
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <span className="font-mono text-sm font-bold text-white/60">{rq.code}</span>
+              <StatusBadge status={rq.status} />
             </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-sm font-semibold ${getStatusColor(rq.status)}`}>
-                <span className="h-2 w-2 rounded-full bg-current opacity-80" />
-                {rq.status.replace(/_/g, ' ')}
-              </span>
-              {stage && (
-                <div className="text-xs text-slate-500 max-w-xs text-right">
-                  {stage.description}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {role === 'COMPRAS' && ['ENVIADA_COMPRAS', 'EN_COMPARATIVO'].includes(rq.status) && (
-                  <Link
-                    href={`/rq/${rq.id}/quotes?role=${role}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-                  >
-                    Gestionar Cotizaciones
-                  </Link>
-                )}
-                {role === 'AUTORIZADOR' && rq.status === 'EN_AUTORIZACION' && (
-                  <Link
-                    href={`/rq/${rq.id}/approve?role=${role}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-green-700"
-                  >
-                    Revisar y Aprobar
-                  </Link>
-                )}
-              </div>
+            <h1 className="text-2xl font-bold leading-tight">{rq.title}</h1>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-white/70">
+              <span>Proyecto: <strong className="text-white">{rq.project.name}</strong></span>
+              <span>Solicitante: <strong className="text-white">{rq.requester.name || rq.requester.email}</strong></span>
+              <span>Creada: <strong className="text-white">{new Date(rq.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
             </div>
           </div>
+        </div>
+
+        {/* ── Workflow timeline ── */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <WorkflowTimeline currentStatus={rq.status} />
         </div>
 
-        {/* Basic Information */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium mb-4">Información Básica</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="block text-sm font-medium text-gray-700">Proyecto</div>
-              <p className="text-sm text-gray-900">{rq.project.name}</p>
-            </div>
-            <div>
-              <div className="block text-sm font-medium text-gray-700">Centro de Costo</div>
-              <p className="text-sm text-gray-900">{rq.costCenter?.name || 'N/A'}</p>
-            </div>
-            <div>
-              <div className="block text-sm font-medium text-gray-700">Solicitante</div>
-              <p className="text-sm text-gray-900">{rq.requester.name}</p>
-            </div>
-            <div>
-              <div className="block text-sm font-medium text-gray-700">Fecha de Creación</div>
-              <p className="text-sm text-gray-900">{new Date(rq.createdAt).toLocaleDateString()}</p>
-            </div>
-          </div>
-          {rq.description && (
-            <div className="mt-4">
-              <div className="block text-sm font-medium text-gray-700">Descripción</div>
-              <p className="text-sm text-gray-900">{rq.description}</p>
-            </div>
+        {/* ── Action buttons ── */}
+        <div className="flex flex-wrap gap-3">
+          {role === 'COMPRAS' && ['ENVIADA_COMPRAS', 'EN_COMPARATIVO'].includes(rq.status) && (
+            <Link
+              href={`/rq/${rq.id}/quotes?role=${role}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Gestionar Cotizaciones
+            </Link>
           )}
+          {role === 'AUTORIZADOR' && rq.status === 'EN_AUTORIZACION' && (
+            <Link
+              href={`/rq/${rq.id}/approve?role=${role}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Revisar y Aprobar
+            </Link>
+          )}
+          {(role === 'COMPRAS' || role === 'ADMIN') && rq.status === 'OC_EMITIDA' && (
+            <Link
+              href={`/rq/${rq.id}/recepcion?role=${role}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              Registrar Recepción
+            </Link>
+          )}
+          {rq.status === 'CERRADA' && (
+            <a
+              href={`/api/rq/${rq.id}/recibo.pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-brand-magenta/30 bg-white px-5 py-2.5 text-sm font-semibold text-brand-magenta shadow-sm transition hover:bg-brand-magentaLight"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Descargar recibo PDF
+            </a>
+          )}
+          <Link
+            href="/rq"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 shadow-sm transition hover:bg-gray-50"
+          >
+            ← Volver a RQs
+          </Link>
         </div>
 
-        {stage && (
-          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 text-blue-900 shadow-sm">
-              <h3 className="text-sm font-semibold uppercase tracking-widest text-blue-600">Pasos sugeridos</h3>
-              <ul className="mt-4 space-y-2 text-sm">
-                {stage.guidance.map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <svg className="mt-1 h-4 w-4 flex-shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* ── Información general ── */}
+        <Section title="Información general">
+          <dl className="grid grid-cols-2 gap-5 md:grid-cols-4">
+            <InfoItem label="Proyecto" value={rq.project.name} />
+            <InfoItem label="Centro de Costo" value={rq.costCenter?.name} />
+            <InfoItem label="Solicitante" value={rq.requester.name || rq.requester.email} />
+            <InfoItem label="Fecha de creación" value={new Date(rq.createdAt).toLocaleDateString('es-CO')} />
+          </dl>
+          {rq.description && (
+            <div className="mt-5 rounded-xl bg-gray-50 p-4">
+              <dt className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Descripción</dt>
+              <dd className="text-sm text-gray-700 leading-relaxed">{rq.description}</dd>
+            </div>
+          )}
+          {stage && (
+            <div className="mt-5 rounded-xl border border-brand-magenta/20 bg-brand-magentaLight/30 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-magenta">Etapa actual · {stage.label}</p>
+              <ul className="mt-2 space-y-1.5">
+                {stage.guidance.map((tip) => (
+                  <li key={tip} className="flex items-start gap-2 text-sm text-brand-plum">
+                    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-magenta" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>{item}</span>
+                    {tip}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-sm text-slate-600">
-              <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500">Responsable</h3>
-              <p className="mt-2 font-semibold text-slate-900">{workflowStages[rq.status as keyof typeof workflowStages]?.actor || 'Equipo'}</p>
-              <p className="mt-1 text-xs text-slate-500">Asegúrate de coordinar con las áreas involucradas para evitar retrabajos.</p>
-            </div>
-          </div>
-        )}
+          )}
+        </Section>
 
-        {/* Items */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-medium mb-4">Ítems Solicitados</h2>
+        {/* ── Ítems ── */}
+        <Section title={`Ítems solicitados (${rq.items.length})`}>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Especificación
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cantidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Unidad
-                  </th>
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <th className="px-4 py-3 text-left">#</th>
+                  <th className="px-4 py-3 text-left">Descripción</th>
+                  <th className="px-4 py-3 text-left">Especificación</th>
+                  <th className="px-4 py-3 text-right">Cantidad</th>
+                  <th className="px-4 py-3 text-left">Unidad</th>
+                  <th className="px-4 py-3 text-right">Precio Unit</th>
+                  <th className="px-4 py-3 text-right">Subtotal</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {rq.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.name}
+              <tbody className="divide-y divide-gray-50">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {rq.items.map((item: any, idx: number) => {
+                  const price = parsePrice(item.spec)
+                  const rowTotal = price * Number(item.qty)
+                  // Clean spec for display (remove injected price)
+                  const displaySpec = (item.spec || '').replace(/Precio unitario:\s*\$[\d.,]+(\s*·\s*)?/i, '').trim()
+                  return (
+                    <tr key={item.id} className="hover:bg-brand-magentaLight/20 transition">
+                      <td className="px-4 py-3 text-sm text-gray-400">{idx + 1}</td>
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <span className="block text-sm font-medium text-gray-900 line-clamp-2">{item.name}</span>
+                      </td>
+                      <td className="px-4 py-3 max-w-[180px]">
+                        <span className="block text-xs text-gray-500 line-clamp-2">{displaySpec || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-sm text-gray-900">{Number(item.qty).toLocaleString('es-CO')}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{item.uom || 'unidad'}</td>
+                      <td className="px-4 py-3 text-right font-mono text-sm text-gray-700">
+                        {price > 0 ? formatCOP(price) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-brand-plum">
+                        {rowTotal > 0 ? formatCOP(rowTotal) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {totalEstimado > 0 && (
+                <tfoot>
+                  <tr className="border-t border-brand-magenta/20 bg-brand-magentaLight/30">
+                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-semibold text-brand-plum">
+                      Total estimado
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{item.spec || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.qty.toString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.uom || 'unidad'}
+                    <td className="px-4 py-3 text-right font-mono text-base font-bold text-brand-magenta">
+                      {formatCOP(totalEstimado)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                </tfoot>
+              )}
             </table>
           </div>
-        </div>
+        </Section>
 
-        {/* Quotes Section */}
+        {/* ── Cotizaciones ── */}
         {rq.quotes.length > 0 && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium mb-4">Cotizaciones Recibidas</h2>
-            <div className="space-y-4">
-              {rq.quotes.map((quote) => (
-                <div key={quote.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-gray-900">{quote.supplier.name}</h3>
-                    <span className="text-lg font-bold text-gray-900">
-                      {quote.currency} {quote.total.toLocaleString()}
-                    </span>
+          <Section title={`Cotizaciones (${rq.quotes.length})`}>
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {rq.quotes.map((quote: any) => (
+                <div key={quote.id} className="flex flex-col gap-3 rounded-xl border border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between hover:bg-brand-magentaLight/10 transition">
+                  <div>
+                    <p className="font-semibold text-gray-900">{quote.supplier.name}</p>
+                    {quote.notes && <p className="mt-0.5 text-sm text-gray-500">{quote.notes}</p>}
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      Recibida: {new Date(quote.createdAt).toLocaleDateString('es-CO')}
+                      {quote.validez && ` · Válida hasta: ${new Date(quote.validez).toLocaleDateString('es-CO')}`}
+                    </p>
                   </div>
-                  {quote.notes && (
-                    <p className="text-sm text-gray-600 mb-2">{quote.notes}</p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    Recibida: {new Date(quote.createdAt).toLocaleDateString()}
-                  </p>
+                  <div className="text-right">
+                    <span className="text-xl font-bold text-brand-plum">
+                      {quote.currency} {Number(quote.total).toLocaleString('es-CO')}
+                    </span>
+                    {rq.comparison?.chosenId === quote.supplierId && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                        ✓ Elegido
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
         )}
 
-        {/* Comparison Section */}
-        {rq.comparison && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium mb-4">Comparativo</h2>
-            <div className="space-y-2">
-              {rq.comparison.chosen && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">Proveedor Seleccionado:</span>
-                  <span className="text-sm text-gray-900">{rq.comparison.chosen.name}</span>
-                  <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded">
-                    ELEGIDO
+        {/* ── Aprobaciones ── */}
+        {rq.approvals.length > 0 && (
+          <Section title={`Historial de aprobaciones (${rq.approvals.length})`}>
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {rq.approvals.map((approval: any) => (
+                <div key={approval.id} className="flex flex-col gap-1 rounded-xl border border-gray-100 p-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {approval.approver?.name || 'Autorizador'}
+                    </p>
+                    {approval.comment && (
+                      <p className="mt-1 text-sm text-gray-600 italic">&ldquo;{approval.comment}&rdquo;</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-400">
+                      {new Date(approval.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    approval.status === 'APROBADO' ? 'bg-green-100 text-green-700' :
+                    approval.status === 'RECHAZADO' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {approval.status}
                   </span>
                 </div>
-              )}
-              <p className="text-xs text-gray-500">
-                Comparativo creado: {new Date(rq.comparison.createdAt).toLocaleDateString()}
-              </p>
+              ))}
             </div>
-          </div>
+          </Section>
         )}
 
-        {/* Purchase Order Section */}
+        {/* ── Orden de Compra ── */}
         {rq.po && (
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-medium mb-4">Orden de Compra</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="block text-sm font-medium text-gray-700">Número OC</div>
-                <p className="text-sm text-gray-900">{rq.po.number}</p>
-              </div>
-              <div>
-                <div className="block text-sm font-medium text-gray-700">Proveedor</div>
-                <p className="text-sm text-gray-900">{rq.po.supplier.name}</p>
-              </div>
-              <div>
-                <div className="block text-sm font-medium text-gray-700">Total</div>
-                <p className="text-sm text-gray-900">
-                  {rq.po.currency} {rq.po.total.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <div className="block text-sm font-medium text-gray-700">Fecha de Emisión</div>
-                <p className="text-sm text-gray-900">
-                  {new Date(rq.po.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </div>
+          <Section title="Orden de Compra">
+            <dl className="grid grid-cols-2 gap-5 md:grid-cols-4">
+              <InfoItem label="N° Orden" value={rq.po.number} />
+              <InfoItem label="Proveedor" value={rq.po.supplier.name} />
+              <InfoItem label="Total" value={`${rq.po.currency} ${Number(rq.po.total).toLocaleString('es-CO')}`} />
+              <InfoItem label="Fecha emisión" value={new Date(rq.po.createdAt).toLocaleDateString('es-CO')} />
+            </dl>
+          </Section>
         )}
+
+        {/* ── Recepciones ── */}
+        {rq.receipts.length > 0 && (
+          <Section title={`Recepciones registradas (${rq.receipts.length})`}>
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {rq.receipts.map((receipt: any) => (
+                <div key={receipt.id} className="flex items-center justify-between rounded-xl border border-gray-100 p-4 hover:bg-brand-magentaLight/10 transition">
+                  <div>
+                    {receipt.notes && <p className="text-sm text-gray-600">{receipt.notes}</p>}
+                    <p className="text-xs text-gray-400">
+                      {new Date(receipt.createdAt).toLocaleDateString('es-CO')}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    receipt.status === 'CONFORME' ? 'bg-green-100 text-green-700' :
+                    receipt.status === 'NO_CONFORME' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {receipt.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
       </div>
     </Layout>
   )

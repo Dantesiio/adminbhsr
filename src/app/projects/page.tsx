@@ -5,9 +5,12 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 export default async function ProjectsPage() {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: 'desc' },
-  })
+  let projects: Awaited<ReturnType<typeof prisma.project.findMany>> = []
+  try {
+    projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } })
+  } catch {
+    // DB not available — render with empty list
+  }
 
   const totalProjects = projects.length
   const projectsWithClient = projects.filter((project) => project.client && project.client.trim().length > 0).length

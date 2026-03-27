@@ -5,9 +5,12 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 export default async function CostCentersPage() {
-  const costCenters = await prisma.costCenter.findMany({
-    orderBy: { name: 'asc' },
-  })
+  let costCenters: Awaited<ReturnType<typeof prisma.costCenter.findMany>> = []
+  try {
+    costCenters = await prisma.costCenter.findMany({ orderBy: { name: 'asc' } })
+  } catch {
+    // DB not available — render with empty list
+  }
 
   const total = costCenters.length
   const active = costCenters.filter((cc) => cc.active).length

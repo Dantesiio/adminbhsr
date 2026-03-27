@@ -5,9 +5,12 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 export default async function SuppliersPage() {
-  const suppliers = await prisma.supplier.findMany({
-    orderBy: { name: 'asc' }
-  })
+  let suppliers: Awaited<ReturnType<typeof prisma.supplier.findMany>> = []
+  try {
+    suppliers = await prisma.supplier.findMany({ orderBy: { name: 'asc' } })
+  } catch {
+    // DB not available — render with empty list
+  }
 
   return (
     <Layout currentRole="COMPRAS">

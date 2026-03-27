@@ -1,17 +1,17 @@
 /**
  * Server actions related to requisitions (RQ).  These functions run
  * exclusively on the server and can be invoked from client code via
- * the built‑in `use server` directive provided by Next.js.
+ * the built-in `use server` directive provided by Next.js.
  */
 'use server'
 
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 
-// Define the schema for an individual RQ item.  Each item must have
-// a name, can optionally specify a specification, a numeric quantity
-// greater than zero and an optional unit of measure.
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
   spec: z.string().optional().default(''),
@@ -19,9 +19,6 @@ const ItemSchema = z.object({
   uom: z.string().optional().default('unidad'),
 })
 
-// Define the overall schema for creating an RQ.  This includes the
-// project it belongs to, an optional cost centre, a title,
-// description and an array of items.
 const RQSchema = z.object({
   projectId: z.string().min(1),
   costCenterId: z.string().optional().nullable(),
@@ -32,10 +29,10 @@ const RQSchema = z.object({
 
 export type CreateRQInput = z.infer<typeof RQSchema>
 
+// ─── createRQ ─────────────────────────────────────────────────────────────────
+
 /**
- * Create a new requisition.  The requester will be looked up using a
- * hardcoded demo user until authentication is implemented.  The RQ
- * code is generated sequentially based on the current count of RQs.
+ * Create a new requisition and immediately set status to ENVIADA_COMPRAS.
  */
 export async function createRQ(input: CreateRQInput) {
   const session = await auth()
@@ -47,7 +44,6 @@ export async function createRQ(input: CreateRQInput) {
     const requester = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!requester) throw new Error('Usuario no encontrado')
 
-    // Generate a sequential code for the RQ
     const count = await prisma.rQ.count()
     const code = `RQ-${String(count + 1).padStart(4, '0')}`
 
@@ -71,10 +67,12 @@ export async function createRQ(input: CreateRQInput) {
       },
       include: { items: true, project: true },
     })
+
+    revalidatePath('/dashboard')
+    revalidatePath('/rq')
     return rq
   } catch (error) {
     console.error('Database error, returning mock RQ:', error)
-    // Return mock data for demo
     return {
       id: `mock-${Date.now()}`,
       code: `RQ-${String(Math.floor(Math.random() * 1000) + 1).padStart(4, '0')}`,
@@ -86,7 +84,7 @@ export async function createRQ(input: CreateRQInput) {
         name: item.name,
         spec: item.spec || '',
         qty: item.qty,
-        uom: item.uom || 'unidad'
+        uom: item.uom || 'unidad',
       })),
       project: { name: 'Proyecto Demo' },
       createdAt: new Date(),
@@ -95,7 +93,13 @@ export async function createRQ(input: CreateRQInput) {
   }
 }
 
-export async function submitApproval(rqId: string, status: 'APROBADO' | 'RECHAZADO', comment?: string) {
+// ─── submitApproval ───────────────────────────────────────────────────────────
+
+export async function submitApproval(
+  rqId: string,
+  status: 'APROBADO' | 'RECHAZADO',
+  comment?: string
+) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
 
@@ -106,30 +110,73 @@ export async function submitApproval(rqId: string, status: 'APROBADO' | 'RECHAZA
   if (!rq || rq.status !== 'EN_AUTORIZACION') throw new Error('RQ no encontrada o no en autorización')
 
   await prisma.approval.create({
-    data: {
-      rqId,
-      approverId: user.id,
-      status,
-      comment,
-    }
+    data: { rqId, approverId: user.id, status, comment },
   })
 
-  // Check if all approvals are done
   const approvals = await prisma.approval.findMany({ where: { rqId } })
-  const allApproved = approvals.every(a => a.status === 'APROBADO')
-  const anyRejected = approvals.some(a => a.status === 'RECHAZADO')
+  const anyRejected = approvals.some((a) => a.status === 'RECHAZADO')
+  const allApproved = approvals.every((a) => a.status === 'APROBADO')
 
   if (anyRejected) {
-    await prisma.rQ.update({
-      where: { id: rqId },
-      data: { status: 'ENVIADA_COMPRAS' } // Back to compras
-    })
+    await prisma.rQ.update({ where: { id: rqId }, data: { status: 'ENVIADA_COMPRAS' } })
   } else if (allApproved) {
-    await prisma.rQ.update({
-      where: { id: rqId },
-      data: { status: 'APROBADA' }
-    })
+    await prisma.rQ.update({ where: { id: rqId }, data: { status: 'APROBADA' } })
   }
 
+  revalidatePath(`/rq/${rqId}`)
   return { success: true }
+}
+
+// ─── registrarRecepcion ───────────────────────────────────────────────────────
+
+const RecepcionSchema = z.object({
+  rqId: z.string().min(1),
+  status: z.enum(['CONFORME', 'NO_CONFORME']),
+  notes: z.string().optional().default(''),
+  fechaRecepcion: z.string().optional(),
+})
+
+export type RegistrarRecepcionInput = z.infer<typeof RecepcionSchema>
+
+/**
+ * Register a goods reception event for an RQ.
+ * - CONFORME  → closes the RQ (status = CERRADA)
+ * - NO_CONFORME → leaves the RQ in EN_RECEPCION with a note
+ */
+export async function registrarRecepcion(input: RegistrarRecepcionInput) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+  if (!user) throw new Error('Usuario no encontrado')
+  if (!['COMPRAS', 'ADMIN'].includes(user.role)) throw new Error('No autorizado para registrar recepciones')
+
+  const data = RecepcionSchema.parse(input)
+
+  const rq = await prisma.rQ.findUnique({ where: { id: data.rqId } })
+  if (!rq) throw new Error('RQ no encontrada')
+  if (rq.status !== 'OC_EMITIDA') {
+    throw new Error('La RQ debe estar en estado OC_EMITIDA para registrar recepción')
+  }
+
+  // Create the receipt record
+  await prisma.receipt.create({
+    data: {
+      rqId: data.rqId,
+      status: data.status,
+      notes: data.notes || null,
+    },
+  })
+
+  // Update RQ status — CONFORME closes it, NO_CONFORME keeps it at OC_EMITIDA
+  const newStatus = data.status === 'CONFORME' ? 'CERRADA' : 'OC_EMITIDA'
+  await prisma.rQ.update({
+    where: { id: data.rqId },
+    data: { status: newStatus },
+  })
+
+  revalidatePath(`/rq/${data.rqId}`)
+  revalidatePath('/dashboard')
+
+  return { success: true, newStatus }
 }
