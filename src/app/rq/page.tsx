@@ -64,9 +64,12 @@ function RQListContent() {
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (statusFilter) params.set('status', statusFilter)
-    fetch(`/api/rq?${params}`)
-      .then((r) => r.json())
-      .then((d) => { setRqs(d.rqs ?? []); setTotal(d.total ?? 0) })
+    fetch(`/api/rq?${params}`, { credentials: 'include' })
+      .then((r) => {
+        if (r.status === 401) { window.location.href = '/login'; return null }
+        return r.json()
+      })
+      .then((d) => { if (d) { setRqs(d.rqs ?? []); setTotal(d.total ?? 0) } })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [page, statusFilter])
@@ -155,7 +158,7 @@ function RQListContent() {
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/rq/${rq.id}?role=${role}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-brand-magenta/20 px-3 py-1 text-xs font-semibold text-brand-magenta opacity-0 transition hover:bg-brand-magentaLight group-hover:opacity-100"
+                        className="inline-flex items-center gap-1 rounded-lg border border-brand-magenta/30 px-3 py-1 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
                       >
                         Ver
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

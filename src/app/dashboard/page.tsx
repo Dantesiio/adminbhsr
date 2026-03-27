@@ -115,9 +115,13 @@ function DashboardContent() {
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/rq?page=${page}&limit=${limit}`)
-      .then((r) => r.json())
+    fetch(`/api/rq?page=${page}&limit=${limit}`, { credentials: 'include' })
+      .then((r) => {
+        if (r.status === 401) { window.location.href = '/login'; return null }
+        return r.json()
+      })
       .then((d) => {
+        if (!d) return
         setRqs(d.rqs || [])
         setKpis(d.kpis || { total: 0, inProcess: 0, approved: 0, closed: 0 })
         setTotal(d.total || 0)

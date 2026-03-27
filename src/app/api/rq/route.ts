@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import type { NextRequest } from 'next/server'
+import type { Session } from 'next-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,41 +13,26 @@ export const dynamic = 'force-dynamic'
  * plus KPI counts. Query params: page, limit, status.
  *
  * SOLICITANTE  → only their own RQs
- * COMPRAS      → RQs in ENVIADA_COMPRAS, EN_COMPARATIVO
+ * COMPRAS      → RQs in ENVIADA_COMPRAS, EN_COMPARATIVO, OC_EMITIDA
  * AUTORIZADOR  → RQs in EN_AUTORIZACION
  * ADMIN        → all RQs
+ *
+ * Uses auth() as a handler wrapper (NextAuth v5 Route Handler pattern)
+ * so the session is always available via req.auth.
  */
-export async function GET(request: Request) {
+export const GET = auth(async function GET(
+  req: NextRequest & { auth: Session | null }
+) {
   try {
-    // auth() may throw in Next.js 14 due to headers() sync/async mismatch with NextAuth v5.
-    // Wrap it separately so a session failure falls through to mock data, not a 500.
-    let session = null
-    try {
-      session = await auth()
-    } catch {
-      // fall through to mock data below
-    }
+    const session = req.auth
 
     if (!session?.user?.id) {
-      // No session — return mock KPIs so the dashboard still renders in demo/dev mode
-      return NextResponse.json({
-        rqs: [
-          { id: '1', code: 'RQ-0001', title: 'Compra de bolsas quirúrgicas', status: 'ENVIADA_COMPRAS', createdAt: new Date(), project: 'ECHO Bolsas', requester: 'Logística HSR', itemCount: 3 },
-          { id: '2', code: 'RQ-0002', title: 'Material de curación', status: 'EN_COMPARATIVO', createdAt: new Date(), project: 'Hospitalización', requester: 'Centro Logístico', itemCount: 5 },
-          { id: '3', code: 'RQ-0003', title: 'Equipos de laboratorio', status: 'APROBADA', createdAt: new Date(), project: 'Laboratorio Clínico', requester: 'Investigación', itemCount: 2 },
-          { id: '4', code: 'RQ-0004', title: 'Nebulizadores pediátricos', status: 'OC_EMITIDA', createdAt: new Date(), project: 'Pediatría', requester: 'Piso 4', itemCount: 6 },
-          { id: '5', code: 'RQ-0005', title: 'Contrato esterilización', status: 'CERRADA', createdAt: new Date(), project: 'Central Esterilización', requester: 'Jefatura', itemCount: 1 },
-        ],
-        total: 12,
-        page: 1,
-        limit: 10,
-        kpis: { total: 12, inProcess: 7, approved: 3, closed: 2 },
-      })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = Math.min(50, parseInt(searchParams.get('limit') || '10'))
+    const limit = Math.min(50, parseInt(searchParams.get('limit') || '15'))
     const statusFilter = searchParams.get('status') || ''
     const skip = (page - 1) * limit
 
@@ -61,7 +48,7 @@ export async function GET(request: Request) {
     if (role === 'SOLICITANTE') {
       where.requesterId = user.id
     } else if (role === 'COMPRAS') {
-      where.status = { in: ['ENVIADA_COMPRAS', 'EN_COMPARATIVO', 'OC_EMITIDA', 'EN_RECEPCION'] }
+      where.status = { in: ['ENVIADA_COMPRAS', 'EN_COMPARATIVO', 'OC_EMITIDA'] }
     } else if (role === 'AUTORIZADOR') {
       where.status = 'EN_AUTORIZACION'
     }
@@ -91,14 +78,13 @@ export async function GET(request: Request) {
       prisma.rQ.count({ where }),
     ])
 
-    // KPI counts (always global for the role scope, ignoring pagination filters)
+    // KPI counts (global for the role scope, ignoring pagination)
     const kpiWhere = role === 'SOLICITANTE' ? { requesterId: user.id } : {}
     const [kpiTotal, kpiClosed, kpiApproved] = await Promise.all([
       prisma.rQ.count({ where: kpiWhere }),
       prisma.rQ.count({ where: { ...kpiWhere, status: 'CERRADA' } }),
       prisma.rQ.count({ where: { ...kpiWhere, status: 'APROBADA' } }),
     ])
-    const kpiInProcess = kpiTotal - kpiClosed - kpiApproved
 
     const formatted = rqs.map((rq) => ({
       id: rq.id,
@@ -118,24 +104,13 @@ export async function GET(request: Request) {
       limit,
       kpis: {
         total: kpiTotal,
-        inProcess: Math.max(0, kpiInProcess),
+        inProcess: Math.max(0, kpiTotal - kpiClosed - kpiApproved),
         approved: kpiApproved,
         closed: kpiClosed,
       },
     })
   } catch (error) {
     console.error('GET /api/rq error:', error)
-    // Return mock data if DB not available
-    return NextResponse.json({
-      rqs: [
-        { id: '1', code: 'RQ-0001', title: 'Compra de bolsas quirúrgicas', status: 'ENVIADA_COMPRAS', createdAt: new Date(), project: 'ECHO Bolsas', requester: 'Logística HSR', itemCount: 3 },
-        { id: '2', code: 'RQ-0002', title: 'Material de curación', status: 'EN_COMPARATIVO', createdAt: new Date(), project: 'Hospitalización', requester: 'Centro Logístico', itemCount: 5 },
-        { id: '3', code: 'RQ-0003', title: 'Equipos de laboratorio', status: 'APROBADA', createdAt: new Date(), project: 'Laboratorio', requester: 'Investigación', itemCount: 2 },
-      ],
-      total: 3,
-      page: 1,
-      limit: 10,
-      kpis: { total: 12, inProcess: 7, approved: 3, closed: 2 },
-    })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})

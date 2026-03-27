@@ -29,8 +29,14 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
+  const isApiRoute = pathname.startsWith('/api/')
+
   // ── Require authentication ──────────────────────────────────────────────────
   if (!req.auth?.user) {
+    if (isApiRoute) {
+      // API routes return JSON 401 instead of redirecting
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/login'
     loginUrl.searchParams.set('callbackUrl', req.nextUrl.href)
@@ -43,7 +49,9 @@ export default auth((req) => {
   for (const { pattern, allowed } of ROLE_RULES) {
     if (pattern.test(pathname)) {
       if (!allowed.includes(role)) {
-        // Redirect unauthorised users to the dashboard
+        if (isApiRoute) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
         return NextResponse.redirect(new URL('/dashboard', req.url))
       }
       break
