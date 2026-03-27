@@ -48,7 +48,7 @@ export const GET = auth(async function GET(
     if (role === 'SOLICITANTE') {
       where.requesterId = user.id
     } else if (role === 'COMPRAS') {
-      where.status = { in: ['ENVIADA_COMPRAS', 'EN_COMPARATIVO', 'OC_EMITIDA'] }
+      where.status = { in: ['ENVIADA_COMPRAS', 'EN_COMPARATIVO', 'APROBADA', 'OC_EMITIDA'] }
     } else if (role === 'AUTORIZADOR') {
       where.status = 'EN_AUTORIZACION'
     }

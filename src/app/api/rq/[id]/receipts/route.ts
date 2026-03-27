@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
+import type { NextRequest } from 'next/server'
+import type { Session } from 'next-auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+type Ctx = { params?: Record<string, string | string[]> }
+
+export const GET = auth(async function GET(req: NextRequest & { auth: Session | null }, ctx: Ctx) {
+  if (!req.auth?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rqId = ctx.params?.['id'] as string
   try {
     const rq = await prisma.rQ.findUnique({
-      where: { id: params.id },
+      where: { id: rqId },
       select: {
         code: true,
         title: true,
@@ -23,4 +31,4 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     console.error(err)
     return NextResponse.json({ rq: null, receipts: [] })
   }
-}
+})
