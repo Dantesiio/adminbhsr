@@ -16,9 +16,10 @@ const ROLE_RULES: Array<{ pattern: RegExp; allowed: string[] }> = [
   { pattern: /^\/rq\/[^/]+\/recepcion/, allowed: ['COMPRAS', 'ADMIN'] },
   // Supplier catalog: purchasing team
   { pattern: /^\/suppliers/, allowed: ['COMPRAS', 'ADMIN'] },
-  // Financial catalogs: admin only
+  // Financial catalogs and user management: admin only
   { pattern: /^\/projects/, allowed: ['ADMIN'] },
   { pattern: /^\/cost-centers/, allowed: ['ADMIN'] },
+  { pattern: /^\/users/, allowed: ['ADMIN'] },
 ]
 
 export default auth((req) => {

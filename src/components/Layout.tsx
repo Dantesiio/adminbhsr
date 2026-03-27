@@ -68,6 +68,15 @@ function IconTag() {
   )
 }
 
+function IconUsers() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  )
+}
+
 function IconLogout() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -109,6 +118,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/suppliers', label: 'Proveedores', icon: IconBuilding, roles: ['COMPRAS', 'ADMIN'] },
   { href: '/projects', label: 'Proyectos', icon: IconFolder, roles: ['ADMIN'] },
   { href: '/cost-centers', label: 'Centros de Costo', icon: IconTag, roles: ['ADMIN'] },
+  { href: '/users', label: 'Usuarios', icon: IconUsers, roles: ['ADMIN'] },
 ]
 
 const ROLE_LABELS: Record<AppRole, string> = {
@@ -127,6 +137,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/suppliers': 'Proveedores',
   '/projects': 'Proyectos',
   '/cost-centers': 'Centros de Costo',
+  '/users': 'Usuarios',
+  '/users/new': 'Nuevo usuario',
 }
 
 function getBreadcrumb(pathname: string): string {
