@@ -266,7 +266,7 @@ function DashboardContent() {
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/rq/${rq.id}?role=${role}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-brand-magenta/20 px-3 py-1 text-xs font-semibold text-brand-magenta opacity-0 transition hover:bg-brand-magentaLight group-hover:opacity-100"
+                        className="inline-flex items-center gap-1 rounded-lg border border-brand-magenta/20 px-3 py-1 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
                       >
                         Ver
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

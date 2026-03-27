@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { WorkflowTimeline } from '@/components/WorkflowTimeline'
 import { getStageByStatus } from '@/lib/workflow'
+import { enviarACompras } from './actions'
 
 interface PageProps {
   params: { id: string }
@@ -134,6 +135,20 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
 
         {/* ── Action buttons ── */}
         <div className="flex flex-wrap gap-3">
+          {/* DRAFT → Enviar a Compras */}
+          {rq.status === 'DRAFT' && ['SOLICITANTE', 'ADMIN'].includes(role) && (
+            <form action={enviarACompras.bind(null, rq.id, role)}>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-magenta to-brand-purple px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                Enviar a Compras
+              </button>
+            </form>
+          )}
           {role === 'COMPRAS' && ['ENVIADA_COMPRAS', 'EN_COMPARATIVO'].includes(rq.status) && (
             <Link
               href={`/rq/${rq.id}/quotes?role=${role}`}
@@ -154,6 +169,18 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Revisar y Aprobar
+            </Link>
+          )}
+          {/* APROBADA → Emitir OC */}
+          {['COMPRAS', 'ADMIN'].includes(role) && rq.status === 'APROBADA' && (
+            <Link
+              href={`/rq/${rq.id}/oc?role=${role}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Emitir Orden de Compra
             </Link>
           )}
           {(role === 'COMPRAS' || role === 'ADMIN') && rq.status === 'OC_EMITIDA' && (
