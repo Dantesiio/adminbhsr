@@ -5,371 +5,549 @@ import Layout from '@/components/Layout'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-interface RQItem { id: string; name: string; spec?: string; qty: number; uom?: string }
-interface Supplier { id: string; name: string; nit?: string; email?: string; phone?: string }
-interface Quote {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface QuoteItemData {
+  id?: string
+  rqItemId?: string | null
+  uom?: string
+  qty: number
+  price: number
+  specNote?: string
+}
+
+interface QuoteData {
   id: string
   supplierId: string
   supplier: { id: string; name: string }
-  currency: string
   total: number
-  validez?: string
-  leadTime?: string
-  notes?: string
-  createdAt: string
+  currency: string
+  validez?: string | null
+  leadTime?: string | null
+  notes?: string | null
+  items: QuoteItemData[]
 }
-interface RQ {
-  id: string; code: string; title: string; status: string
-  items: RQItem[]
-  project: { name: string }
-  quotes: Quote[]
-  comparison: { chosenId: string | null } | null
+
+interface RQItemData {
+  id: string
+  name: string
+  spec?: string | null  // used as lineaProyecto
+  qty: number
+  uom?: string | null
+}
+
+interface RQData {
+  id: string
+  code: string
+  title: string
+  status: string
+  items: RQItemData[]
+  quotes: QuoteData[]
+  comparison?: { chosenId?: string | null }
+}
+
+interface SupplierOption {
+  id: string
+  name: string
+  nit?: string
+}
+
+interface ModalItemRow {
+  rqItemId: string
+  uom: string
+  qty: string
+  price: string
+  specNote: string
 }
 
 const formatCOP = (v: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+  new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
-export default function RQQuotesPage({ params }: { params: { id: string } }) {
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function QuotesPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const role = useSearchParams().get('role') || 'COMPRAS'
+  const searchParams = useSearchParams()
+  const role = searchParams.get('role') || 'COMPRAS'
 
-  const [rq, setRq] = useState<RQ | null>(null)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [rq, setRq] = useState<RQData | null>(null)
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [selecting, setSelecting] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null)
+  const [savingWinner, setSavingWinner] = useState(false)
   const [error, setError] = useState('')
-  const [chosenId, setChosenId] = useState<string | null>(null)
 
-  // Form state
-  const [supplierId, setSupplierId] = useState('')
-  const [total, setTotal] = useState('')
-  const [validez, setValidez] = useState('')
-  const [leadTime, setLeadTime] = useState('')
-  const [notes, setNotes] = useState('')
+  // Modal state
+  const [modalSupplierId, setModalSupplierId] = useState('')
+  const [modalNotes, setModalNotes] = useState('')
+  const [modalValidez, setModalValidez] = useState('')
+  const [modalLeadTime, setModalLeadTime] = useState('')
+  const [modalRows, setModalRows] = useState<ModalItemRow[]>([])
+  const [savingQuote, setSavingQuote] = useState(false)
+  const [modalError, setModalError] = useState('')
 
-  const load = useCallback(async () => {
+  const loadData = useCallback(() => {
     setLoading(true)
-    try {
-      const res = await fetch(`/api/rq/${params.id}/quotes`, { credentials: 'include' })
-      if (!res.ok) return
-      const data = await res.json()
-      setRq(data.rq)
-      setSuppliers(data.suppliers)
-      setChosenId(data.rq.comparison?.chosenId ?? null)
-    } finally {
-      setLoading(false)
-    }
+    fetch(`/api/rq/${params.id}/quotes`, { credentials: 'include' })
+      .then(r => {
+        if (r.status === 401) { window.location.href = '/login'; return null }
+        return r.json()
+      })
+      .then(d => {
+        if (!d) return
+        setRq(d.rq)
+        setSuppliers(d.suppliers)
+        if (d.rq.comparison?.chosenId) setSelectedWinnerId(d.rq.comparison.chosenId)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [params.id])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { loadData() }, [loadData])
 
-  // Already-quoted supplier IDs
-  const quotedIds = rq?.quotes.map(q => q.supplierId) ?? []
-  const availableSuppliers = suppliers.filter(s => !quotedIds.includes(s.id))
+  const availableSuppliers = suppliers.filter(
+    s => !rq?.quotes.some(q => q.supplierId === s.id)
+  )
 
-  async function handleAddQuote(e: React.FormEvent) {
+  function openModal() {
+    if (!rq) return
+    setModalSupplierId('')
+    setModalNotes('')
+    setModalValidez('')
+    setModalLeadTime('')
+    setModalRows(rq.items.map(item => ({
+      rqItemId: item.id,
+      uom: item.uom || '',
+      qty: String(item.qty),
+      price: '',
+      specNote: '',
+    })))
+    setModalError('')
+    setShowModal(true)
+  }
+
+  function updateModalRow(idx: number, field: keyof ModalItemRow, value: string) {
+    setModalRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+
+  const modalTotal = modalRows.reduce((sum, row) => {
+    return sum + (parseFloat(row.qty) || 0) * (parseFloat(row.price) || 0)
+  }, 0)
+
+  async function submitQuote(e: React.FormEvent) {
     e.preventDefault()
-    if (!supplierId || !total) { setError('Proveedor y total son obligatorios'); return }
-    setSaving(true); setError('')
+    if (!modalSupplierId) { setModalError('Selecciona un proveedor'); return }
+    if (modalTotal === 0) { setModalError('Ingresa al menos un precio'); return }
+    setSavingQuote(true)
+    setModalError('')
     try {
+      const items = modalRows
+        .filter(r => parseFloat(r.price) > 0 || parseFloat(r.qty) > 0)
+        .map(r => ({
+          rqItemId: r.rqItemId,
+          uom: r.uom || null,
+          qty: parseFloat(r.qty) || 0,
+          price: parseFloat(r.price) || 0,
+          specNote: r.specNote || null,
+        }))
+
       const res = await fetch(`/api/rq/${params.id}/quotes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ supplierId, total: parseFloat(total.replace(/\./g, '').replace(',', '.')), validez: validez || null, leadTime: leadTime || null, notes: notes || null }),
+        body: JSON.stringify({
+          supplierId: modalSupplierId,
+          currency: 'COP',
+          validez: modalValidez || undefined,
+          leadTime: modalLeadTime || undefined,
+          notes: modalNotes || undefined,
+          items,
+        }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Error'); return }
-      // Reset form
-      setSupplierId(''); setTotal(''); setValidez(''); setLeadTime(''); setNotes('')
-      setShowForm(false)
-      await load()
+      if (!res.ok) { setModalError(data.error || 'Error al guardar'); return }
+      setShowModal(false)
+      loadData()
+    } catch {
+      setModalError('Error de conexión')
     } finally {
-      setSaving(false)
+      setSavingQuote(false)
     }
   }
 
-  async function handleSelectWinner() {
-    if (!chosenId) { setError('Selecciona el proveedor ganador'); return }
-    if ((rq?.quotes.length ?? 0) < 2) { setError('Se necesitan al menos 2 cotizaciones'); return }
-    setSelecting(true); setError('')
+  async function confirmWinner() {
+    if (!selectedWinnerId) { setError('Selecciona el proveedor ganador'); return }
+    if (!rq || rq.quotes.length < 2) { setError('Se necesitan al menos 2 cotizaciones'); return }
+    setSavingWinner(true)
+    setError('')
     try {
       const res = await fetch(`/api/rq/${params.id}/comparison`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ chosenSupplierId: chosenId }),
+        body: JSON.stringify({ chosenSupplierId: selectedWinnerId }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Error'); return }
+      if (!res.ok) { setError(data.error || 'Error al guardar'); return }
       router.push(`/rq/${params.id}?role=${role}`)
+    } catch {
+      setError('Error de conexión')
     } finally {
-      setSelecting(false)
+      setSavingWinner(false)
     }
   }
 
-  if (loading) {
-    return (
-      <Layout currentRole={role}>
-        <div className="space-y-4">
-          <div className="h-40 animate-pulse rounded-2xl bg-gray-100" />
-          <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
-        </div>
-      </Layout>
-    )
-  }
-
-  if (!rq) {
-    return (
-      <Layout currentRole={role}>
-        <div className="flex h-64 items-center justify-center text-sm text-gray-400">RQ no encontrada</div>
-      </Layout>
-    )
-  }
-
-  const canAddMore = availableSuppliers.length > 0 && ['ENVIADA_COMPRAS', 'EN_COMPARATIVO'].includes(rq.status)
-  const canSelectWinner = rq.quotes.length >= 2 && rq.status === 'EN_COMPARATIVO'
-  const alreadySelected = !!rq.comparison?.chosenId
+  const canSendToAuth = rq && rq.quotes.length >= 2 && selectedWinnerId && rq.status === 'EN_COMPARATIVO'
+  const readonly = !['EN_COMPARATIVO', 'ENVIADA_COMPRAS'].includes(rq?.status ?? '')
 
   return (
     <Layout currentRole={role}>
       <div className="space-y-6">
 
         {/* Header */}
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-7 text-white shadow-xl">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-7 text-white shadow-xl">
+          <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+          <div className="relative flex items-start justify-between gap-4">
             <div>
-              <Link href={`/rq/${params.id}?role=${role}`} className="inline-flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-white/70">Comparativo de Cotizaciones</p>
+              <h1 className="mt-2 text-2xl font-bold">{loading ? '…' : rq?.code ?? params.id}</h1>
+              {rq && <p className="mt-1 text-sm text-white/75 line-clamp-1">{rq.title}</p>}
+            </div>
+            {!loading && !readonly && availableSuppliers.length > 0 && (
+              <button
+                onClick={openModal}
+                className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {rq.code}
-              </Link>
-              <h1 className="mt-1 text-2xl font-bold">Cotizaciones</h1>
-              <p className="mt-1 text-sm text-white/70">{rq.title} · {rq.project.name}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canAddMore && (
-                <button onClick={() => { setShowForm(true); setError('') }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow hover:shadow-md transition">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Agregar cotización
-                </button>
-              )}
-              {canSelectWinner && !alreadySelected && (
-                <button onClick={handleSelectWinner} disabled={!chosenId || selecting}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-sm font-semibold text-white hover:bg-white/30 transition disabled:opacity-50">
-                  {selecting ? 'Enviando…' : '✓ Enviar a Autorización'}
-                </button>
-              )}
-            </div>
-          </div>
-          {/* Progress indicator */}
-          <div className="mt-4 flex items-center gap-2 text-xs text-white/60">
-            <span className={rq.quotes.length >= 1 ? 'text-white' : ''}>1 cotización</span>
-            <span>→</span>
-            <span className={rq.quotes.length >= 2 ? 'text-white' : ''}>2 cotizaciones (mínimo)</span>
-            <span>→</span>
-            <span className={alreadySelected ? 'text-white' : ''}>Ganador seleccionado → Autorización</span>
+                Agregar cotización
+              </button>
+            )}
           </div>
         </div>
 
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
+        <Link
+          href={`/rq/${params.id}?role=${role}`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition"
+        >
+          ← Volver al detalle de la RQ
+        </Link>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-
-          {/* Quotes list */}
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                <h2 className="font-semibold text-gray-900">Cotizaciones recibidas</h2>
-                <span className="rounded-full bg-blue-50 px-3 py-0.5 text-xs font-semibold text-blue-700">
-                  {rq.quotes.length} {rq.quotes.length === 1 ? 'cotización' : 'cotizaciones'}
-                </span>
-              </div>
-
-              {rq.quotes.length === 0 ? (
-                <div className="px-6 py-16 text-center">
-                  <p className="text-sm text-gray-400">Aún no hay cotizaciones. Agrega la primera con el botón de arriba.</p>
+        {loading ? (
+          <div className="flex h-48 items-center justify-center text-gray-400">Cargando comparativo…</div>
+        ) : !rq ? (
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center text-sm text-red-600">
+            Requisición no encontrada.
+          </div>
+        ) : (
+          <>
+            {/* Progress */}
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              {[
+                { label: 'Mínimo 1 cotización', done: rq.quotes.length >= 1 },
+                { label: 'Mínimo 2 cotizaciones', done: rq.quotes.length >= 2 },
+                { label: 'Proveedor seleccionado', done: !!selectedWinnerId },
+              ].map((step, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {i > 0 && <div className={`h-px w-6 ${step.done ? 'bg-indigo-300' : 'bg-gray-200'}`} />}
+                  <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${step.done ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {step.done ? '✓' : '○'} {step.label}
+                  </span>
                 </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {rq.quotes.map(quote => {
-                    const isChosen = chosenId === quote.supplierId
-                    return (
-                      <div key={quote.id} className={`flex items-start justify-between gap-4 px-6 py-4 transition ${isChosen ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
-                        <div className="flex items-start gap-3">
-                          {/* Radio to select winner */}
-                          {canSelectWinner && !alreadySelected && (
-                            <input type="radio" name="winner" value={quote.supplierId}
-                              checked={isChosen}
-                              onChange={() => setChosenId(quote.supplierId)}
-                              className="mt-1 h-4 w-4 cursor-pointer accent-green-600" />
-                          )}
-                          {alreadySelected && isChosen && (
-                            <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-white text-xs">✓</span>
-                          )}
-                          <div>
-                            <p className="font-semibold text-gray-900">{quote.supplier.name}</p>
-                            {quote.notes && <p className="mt-0.5 text-xs text-gray-500">{quote.notes}</p>}
-                            <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
-                              {quote.validez && <span>Válida hasta: {new Date(quote.validez).toLocaleDateString('es-CO')}</span>}
-                              {quote.leadTime && <span>Entrega: {quote.leadTime}</span>}
-                              <span>Recibida: {new Date(quote.createdAt).toLocaleDateString('es-CO')}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-xl font-bold ${isChosen ? 'text-green-700' : 'text-gray-900'}`}>
-                            {formatCOP(Number(quote.total))}
-                          </p>
-                          <p className="text-xs text-gray-400">{quote.currency}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+              ))}
+              <span className="ml-auto text-sm text-gray-500">
+                {rq.quotes.length} proveedor{rq.quotes.length !== 1 ? 'es' : ''}
+              </span>
             </div>
 
-            {/* Ítems de la RQ */}
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-              <div className="border-b border-gray-100 px-6 py-4">
-                <h2 className="font-semibold text-gray-900">Ítems a cotizar ({rq.items.length})</h2>
+            {/* Matrix table */}
+            {rq.quotes.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-gray-200 p-14 text-center">
+                <p className="text-sm font-medium text-gray-500">Aún no hay cotizaciones registradas</p>
+                <p className="mt-1 text-xs text-gray-400">Usa "Agregar cotización" para ingresar la información recibida de cada proveedor</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    <tr>
-                      <th className="px-6 py-3 text-left">Descripción</th>
-                      <th className="px-6 py-3 text-left">Especificación</th>
-                      <th className="px-6 py-3 text-right">Cant.</th>
-                      <th className="px-6 py-3 text-left">Unidad</th>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <table className="min-w-full border-collapse text-sm">
+                  <thead>
+                    {/* Row 1: supplier group headers */}
+                    <tr className="border-b border-gray-200 bg-slate-700 text-white">
+                      <th colSpan={4} className="border-r border-slate-600 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                        Detalle / Comparación
+                      </th>
+                      {rq.quotes.map(q => (
+                        <th
+                          key={q.id}
+                          colSpan={5}
+                          className={`border-r border-slate-600 px-4 py-3 text-center text-xs font-bold uppercase tracking-wider ${selectedWinnerId === q.supplierId ? 'bg-emerald-700' : ''}`}
+                        >
+                          {q.supplier.name}
+                          {selectedWinnerId === q.supplierId && (
+                            <span className="ml-1.5 rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] text-emerald-900">✓ Ganador</span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                    {/* Row 2: column labels */}
+                    <tr className="border-b-2 border-gray-300 bg-gray-100 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="w-20 px-3 py-2.5 text-left">Línea</th>
+                      <th className="min-w-[220px] px-3 py-2.5 text-left">Descripción</th>
+                      <th className="px-3 py-2.5 text-left">Present.</th>
+                      <th className="border-r border-gray-300 px-3 py-2.5 text-right">Cant. Req.</th>
+                      {rq.quotes.map(q => (
+                        <>
+                          <th key={`${q.id}-uom`} className="px-2 py-2.5 text-center">Unidad</th>
+                          <th key={`${q.id}-qty`} className="px-2 py-2.5 text-right">Cant.</th>
+                          <th key={`${q.id}-pu`} className="px-2 py-2.5 text-right">P. Unitario</th>
+                          <th key={`${q.id}-pt`} className="px-2 py-2.5 text-right">P. Total</th>
+                          <th key={`${q.id}-nov`} className="border-r border-gray-300 min-w-[130px] px-2 py-2.5 text-left">Novedad</th>
+                        </>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {rq.items.map(item => (
-                      <tr key={item.id}>
-                        <td className="px-6 py-3 text-sm font-medium text-gray-900">{item.name}</td>
-                        <td className="px-6 py-3 text-sm text-gray-500 max-w-[200px] truncate">{item.spec || '—'}</td>
-                        <td className="px-6 py-3 text-right text-sm text-gray-900">{item.qty}</td>
-                        <td className="px-6 py-3 text-sm text-gray-500">{item.uom || 'unidad'}</td>
+
+                  <tbody className="divide-y divide-gray-100">
+                    {rq.items.map((item, rowIdx) => (
+                      <tr key={item.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                        <td className="px-3 py-2.5 font-mono text-xs text-gray-400">{item.spec || '—'}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-800">{item.name}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-500">{item.uom || '—'}</td>
+                        <td className="border-r border-gray-200 px-3 py-2.5 text-right font-mono font-bold text-gray-700">{Number(item.qty)}</td>
+                        {rq.quotes.map(q => {
+                          const qi = q.items.find(i => i.rqItemId === item.id)
+                          const rowTotal = qi ? Number(qi.price) * Number(qi.qty) : null
+                          const isWinner = selectedWinnerId === q.supplierId
+                          return (
+                            <>
+                              <td key={`${q.id}-uom`} className={`px-2 py-2.5 text-center text-xs text-gray-500 ${isWinner ? 'bg-emerald-50' : ''}`}>{qi?.uom || '—'}</td>
+                              <td key={`${q.id}-qty`} className={`px-2 py-2.5 text-right font-mono text-xs ${isWinner ? 'bg-emerald-50' : ''}`}>{qi ? Number(qi.qty) : '—'}</td>
+                              <td key={`${q.id}-pu`} className={`px-2 py-2.5 text-right font-mono text-xs ${isWinner ? 'bg-emerald-50' : ''}`}>
+                                {qi ? formatCOP(Number(qi.price)) : '—'}
+                              </td>
+                              <td key={`${q.id}-pt`} className={`px-2 py-2.5 text-right font-mono text-xs font-semibold ${isWinner ? 'bg-yellow-100 text-emerald-800' : rowTotal ? 'text-gray-800' : 'text-gray-300'}`}>
+                                {rowTotal != null ? formatCOP(rowTotal) : '—'}
+                              </td>
+                              <td key={`${q.id}-nov`} className={`border-r border-gray-200 px-2 py-2.5 text-xs italic ${isWinner ? 'bg-emerald-50 text-emerald-700' : 'text-red-500'}`}>
+                                {qi?.specNote || ''}
+                              </td>
+                            </>
+                          )
+                        })}
                       </tr>
                     ))}
                   </tbody>
+
+                  <tfoot>
+                    {/* Totals */}
+                    <tr className="border-t-2 border-gray-300 bg-gray-100 font-bold">
+                      <td colSpan={4} className="border-r border-gray-300 px-3 py-3 text-right text-xs font-bold uppercase tracking-wide text-gray-600">
+                        Total
+                      </td>
+                      {rq.quotes.map(q => {
+                        const isWinner = selectedWinnerId === q.supplierId
+                        return (
+                          <>
+                            <td key={`${q.id}-f1`} colSpan={3} className={isWinner ? 'bg-emerald-100' : ''} />
+                            <td key={`${q.id}-tot`} className={`px-2 py-3 text-right font-mono text-base font-bold ${isWinner ? 'bg-yellow-200 text-emerald-900' : 'text-gray-800'}`}>
+                              {formatCOP(Number(q.total))}
+                            </td>
+                            <td key={`${q.id}-f2`} className={`border-r border-gray-300 ${isWinner ? 'bg-emerald-100' : ''}`} />
+                          </>
+                        )
+                      })}
+                    </tr>
+
+                    {/* Winner selection */}
+                    {!readonly && (
+                      <tr className="bg-white">
+                        <td colSpan={4} className="border-r border-gray-200 px-3 py-3 text-right text-xs text-gray-400 italic">
+                          Seleccionar ganador →
+                        </td>
+                        {rq.quotes.map(q => (
+                          <>
+                            <td key={`${q.id}-sel`} colSpan={4} className="px-2 py-3 text-center">
+                              <button
+                                onClick={() => setSelectedWinnerId(q.supplierId)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                  selectedWinnerId === q.supplierId
+                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                    : 'border border-gray-200 text-gray-600 hover:border-emerald-400 hover:text-emerald-700'
+                                }`}
+                              >
+                                {selectedWinnerId === q.supplierId ? '✓ Seleccionado' : 'Seleccionar'}
+                              </button>
+                            </td>
+                            <td key={`${q.id}-selsp`} className="border-r border-gray-200" />
+                          </>
+                        ))}
+                      </tr>
+                    )}
+                  </tfoot>
                 </table>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Sidebar */}
-          <aside className="space-y-4">
-            {/* Checklist */}
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-sm">
-              <p className="font-semibold uppercase tracking-widest text-blue-700 text-xs">Checklist del comprador</p>
-              <ul className="mt-3 space-y-2 text-blue-900">
-                {[
-                  'Confirma que los proveedores recibieron la solicitud',
-                  'Los precios incluyen impuestos y condiciones de entrega',
-                  'Se tienen mínimo 2 cotizaciones para comparar',
-                  'Selecciona el proveedor ganador y envía a autorización',
-                ].map(tip => (
-                  <li key={tip} className="flex items-start gap-2">
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {tip}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Available suppliers */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Proveedores disponibles</p>
-              {availableSuppliers.length === 0 ? (
-                <p className="mt-3 text-xs text-gray-400">Todos los proveedores ya tienen cotización en esta RQ.</p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {availableSuppliers.map(s => (
-                    <div key={s.id} className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-sm font-semibold text-gray-900">{s.name}</p>
-                      <p className="text-xs text-gray-400">{s.email || 'Sin email'}</p>
-                    </div>
-                  ))}
-                </div>
+            {/* Bottom actions */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                {error && (
+                  <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+                )}
+              </div>
+              {!readonly && (
+                <button
+                  onClick={confirmWinner}
+                  disabled={!canSendToAuth || savingWinner}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingWinner && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                  Enviar a Autorización →
+                </button>
               )}
             </div>
-          </aside>
-        </div>
+          </>
+        )}
+      </div>
 
-        {/* Add quote modal */}
-        {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="border-b border-gray-100 px-6 py-4">
-                <h3 className="font-semibold text-gray-900">Agregar cotización</h3>
+      {/* ── Modal ──────────────────────────────────────────────────────────────── */}
+      {showModal && rq && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
+          <div className="relative my-8 w-full max-w-5xl rounded-2xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+              <div>
+                <h2 className="text-base font-bold text-white">Registrar cotización de proveedor</h2>
+                <p className="text-xs text-white/70">Ingresa la información recibida por correo o teléfono</p>
               </div>
-              <form onSubmit={handleAddQuote} className="space-y-4 p-6">
-                {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+              <button onClick={() => setShowModal(false)} className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 transition">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">Proveedor <span className="text-red-500">*</span></label>
-                  <select value={supplierId} onChange={e => setSupplierId(e.target.value)} required
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
-                    <option value="">Selecciona un proveedor…</option>
+            <form onSubmit={submitQuote} className="p-6">
+              {/* Supplier + metadata */}
+              <div className="mb-5 grid gap-4 sm:grid-cols-4">
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Proveedor *</label>
+                  <select
+                    value={modalSupplierId}
+                    onChange={e => setModalSupplierId(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                  >
+                    <option value="">Seleccionar proveedor…</option>
                     {availableSuppliers.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}{s.nit ? ` · ${s.nit}` : ''}</option>
+                      <option key={s.id} value={s.id}>{s.name}{s.nit ? ` — NIT ${s.nit}` : ''}</option>
                     ))}
                   </select>
                 </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Total COP <span className="text-red-500">*</span></label>
-                    <input type="text" value={total} onChange={e => setTotal(e.target.value)} required placeholder="Ej. 1500000"
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">Válida hasta</label>
-                    <input type="date" value={validez} onChange={e => setValidez(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                  </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Validez cotización</label>
+                  <input type="date" value={modalValidez} onChange={e => setModalValidez(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:outline-none" />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">Tiempo de entrega</label>
-                  <input type="text" value={leadTime} onChange={e => setLeadTime(e.target.value)} placeholder="Ej. 5 días hábiles"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Lead time entrega</label>
+                  <input type="text" value={modalLeadTime} onChange={e => setModalLeadTime(e.target.value)}
+                    placeholder="Ej. 5 días hábiles"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:outline-none" />
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-700">Notas</label>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Condiciones, observaciones…"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                </div>
+              {/* Items */}
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-3 py-2.5 text-left">Línea</th>
+                      <th className="min-w-[200px] px-3 py-2.5 text-left">Descripción solicitada</th>
+                      <th className="px-3 py-2.5 text-center">Cant. Req.</th>
+                      <th className="px-3 py-2.5 text-left">Unidad ofrecida</th>
+                      <th className="px-3 py-2.5 text-right">Cantidad</th>
+                      <th className="px-3 py-2.5 text-right">Precio Unitario COP</th>
+                      <th className="px-3 py-2.5 text-right">Precio Total</th>
+                      <th className="min-w-[150px] px-3 py-2.5 text-left">Novedad / Observación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rq.items.map((item, idx) => {
+                      const row = modalRows[idx]
+                      if (!row) return null
+                      const qty = parseFloat(row.qty) || 0
+                      const price = parseFloat(row.price) || 0
+                      const rowTotal = qty * price
+                      return (
+                        <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                          <td className="px-3 py-2 font-mono text-xs text-gray-400">{item.spec || '—'}</td>
+                          <td className="px-3 py-2 text-gray-800">{item.name}</td>
+                          <td className="px-3 py-2 text-center font-mono font-bold text-gray-600">{Number(item.qty)}</td>
+                          <td className="px-3 py-2">
+                            <input type="text" value={row.uom} onChange={e => updateModalRow(idx, 'uom', e.target.value)}
+                              placeholder={item.uom || 'unidad'}
+                              className="w-28 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input type="number" min="0" step="0.01" value={row.qty} onChange={e => updateModalRow(idx, 'qty', e.target.value)}
+                              className="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1 text-right text-xs focus:border-indigo-400 focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input type="number" min="0" step="1" value={row.price} onChange={e => updateModalRow(idx, 'price', e.target.value)}
+                              placeholder="0"
+                              className="w-32 rounded-lg border border-gray-200 bg-white px-2 py-1 text-right text-xs focus:border-indigo-400 focus:outline-none" />
+                          </td>
+                          <td className={`px-3 py-2 text-right font-mono text-xs font-semibold ${rowTotal > 0 ? 'text-indigo-700' : 'text-gray-300'}`}>
+                            {rowTotal > 0 ? formatCOP(rowTotal) : '—'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input type="text" value={row.specNote} onChange={e => updateModalRow(idx, 'specNote', e.target.value)}
+                              placeholder="Ej. Marca Biosystem…"
+                              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs focus:border-indigo-400 focus:outline-none" />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-indigo-200 bg-indigo-50">
+                      <td colSpan={6} className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wide text-indigo-700">Total cotización</td>
+                      <td className="px-3 py-3 text-right font-mono text-base font-bold text-indigo-900">{formatCOP(modalTotal)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => { setShowForm(false); setError('') }}
-                    className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition disabled:opacity-60">
-                    {saving ? 'Guardando…' : 'Guardar cotización'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              {/* Notes */}
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Observaciones generales</label>
+                <textarea value={modalNotes} onChange={e => setModalNotes(e.target.value)} rows={2}
+                  placeholder="Condiciones de pago, descuentos, garantías, condiciones de entrega…"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
+              </div>
+
+              {modalError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{modalError}</div>
+              )}
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowModal(false)}
+                  className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingQuote || modalTotal === 0}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition hover:opacity-90 disabled:opacity-60">
+                  {savingQuote && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                  Guardar cotización
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </Layout>
   )
 }

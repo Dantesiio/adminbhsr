@@ -13,10 +13,9 @@ import { useRouter } from 'next/navigation'
 
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
-  spec: z.string().optional(),
+  spec: z.string().optional(),   // lineaProyecto
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
-  unitPrice: z.number().min(0).optional(),
 })
 
 const RQSchema = z.object({
@@ -65,7 +64,7 @@ export default function NewRQPage() {
   const router = useRouter()
   const form = useForm<RQForm>({
     resolver: zodResolver(RQSchema),
-    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 }] },
+    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad' }] },
   })
   const { fields, append, remove, replace } = useFieldArray({ name: 'items', control: form.control })
 
@@ -92,13 +91,7 @@ export default function NewRQPage() {
       .catch(() => {})
   }, [])
 
-  // Watch items to calculate totals
   const watchedItems = useWatch({ control: form.control, name: 'items' })
-  const grandTotal = (watchedItems || []).reduce((acc, item) => {
-    const qty = Number(item?.qty) || 0
-    const price = Number(item?.unitPrice) || 0
-    return acc + qty * price
-  }, 0)
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -113,9 +106,7 @@ export default function NewRQPage() {
         description: values.description || '',
         items: values.items.map((item) => ({
           name: item.name,
-          spec: item.unitPrice
-            ? `Precio unitario: ${formatCOP(item.unitPrice)}${item.spec ? ' · ' + item.spec : ''}`
-            : item.spec || '',
+          spec: item.spec || '',
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
         })),
@@ -427,7 +418,7 @@ export default function NewRQPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 })}
+                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad' })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -438,24 +429,20 @@ export default function NewRQPage() {
             </div>
 
             {/* Table header */}
-            <div className="mb-2 hidden grid-cols-[2fr_1fr_80px_90px_110px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
+            <div className="mb-2 hidden grid-cols-[2fr_1fr_80px_90px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
               <span>Descripción *</span>
-              <span>Línea / Especificación</span>
+              <span>Línea de Proyecto</span>
               <span>Unidad</span>
               <span className="text-right">Cantidad</span>
-              <span className="text-right">Precio Unit COP</span>
               <span />
             </div>
 
             <div className="space-y-3">
               {fields.map((field, idx) => {
-                const qty = Number(watchedItems?.[idx]?.qty) || 0
-                const price = Number(watchedItems?.[idx]?.unitPrice) || 0
-                const rowTotal = qty * price
                 return (
                   <div
                     key={field.id}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_80px_90px_110px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_80px_90px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
                   >
                     {/* Name */}
                     <div>
@@ -470,12 +457,12 @@ export default function NewRQPage() {
                       )}
                     </div>
 
-                    {/* Spec / Línea */}
+                    {/* Línea de Proyecto */}
                     <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Línea / Especificación</label>
+                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Línea de Proyecto</label>
                       <input
                         className={inputCls}
-                        placeholder="Línea de proyecto / specs"
+                        placeholder="Ej. 1.2.4"
                         {...form.register(`items.${idx}.spec`)}
                       />
                     </div>
@@ -502,24 +489,6 @@ export default function NewRQPage() {
                       />
                     </div>
 
-                    {/* Unit price */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Precio Unit COP</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        className={`${inputCls} text-right`}
-                        placeholder="0"
-                        {...form.register(`items.${idx}.unitPrice`, { valueAsNumber: true })}
-                      />
-                      {rowTotal > 0 && (
-                        <p className="mt-0.5 text-right text-[10px] text-gray-400">
-                          = {formatCOP(rowTotal)}
-                        </p>
-                      )}
-                    </div>
-
                     {/* Remove */}
                     <div className="flex justify-end sm:justify-center">
                       <button
@@ -542,13 +511,6 @@ export default function NewRQPage() {
               <p className="mt-3 text-sm text-red-600">{form.formState.errors.items.message}</p>
             )}
 
-            {/* Total bar */}
-            {grandTotal > 0 && (
-              <div className="mt-6 flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-magenta/10 to-brand-purple/10 px-5 py-4">
-                <span className="text-sm font-semibold text-brand-plum">Total estimado de la RQ</span>
-                <span className="text-xl font-bold text-brand-magenta tabular-nums">{formatCOP(grandTotal)}</span>
-              </div>
-            )}
           </div>
 
           {/* Actions */}

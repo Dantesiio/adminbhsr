@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 type Ctx = { params?: Record<string, string | string[]> }
 
-/** GET /api/rq/[id]/quotes — load RQ with existing quotes + supplier catalog */
+/** GET /api/rq/[id]/quotes — load RQ with items, quotes (with QuoteItems) + supplier catalog */
 export const GET = auth(async function GET(req: NextRequest & { auth: Session | null }, ctx: Ctx) {
   if (!req.auth?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -18,16 +18,22 @@ export const GET = auth(async function GET(req: NextRequest & { auth: Session | 
       prisma.rQ.findUnique({
         where: { id: rqId },
         include: {
-          items: true,
+          items: { orderBy: { id: 'asc' } },
           project: { select: { name: true } },
           quotes: {
-            include: { supplier: { select: { id: true, name: true } } },
+            include: {
+              supplier: { select: { id: true, name: true } },
+              items: true,   // QuoteItems per supplier
+            },
             orderBy: { createdAt: 'asc' },
           },
           comparison: true,
         },
       }),
-      prisma.supplier.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, nit: true, email: true, phone: true } }),
+      prisma.supplier.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, nit: true, email: true, phone: true },
+      }),
     ])
 
     if (!rq) return NextResponse.json({ error: 'RQ not found' }, { status: 404 })
@@ -37,7 +43,7 @@ export const GET = auth(async function GET(req: NextRequest & { auth: Session | 
   }
 })
 
-/** POST /api/rq/[id]/quotes — add a quote */
+/** POST /api/rq/[id]/quotes — add a quote with per-item pricing */
 export const POST = auth(async function POST(req: NextRequest & { auth: Session | null }, ctx: Ctx) {
   const session = req.auth
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -47,10 +53,26 @@ export const POST = auth(async function POST(req: NextRequest & { auth: Session 
 
   const rqId = ctx.params?.['id'] as string
   try {
-    const { supplierId, total, currency = 'COP', validez, leadTime, notes } = await req.json()
+    const {
+      supplierId,
+      currency = 'COP',
+      validez,
+      leadTime,
+      notes,
+      items = [],   // QuoteItem rows: { rqItemId, uom, qty, price, specNote }
+    } = await req.json()
 
-    if (!supplierId || !total) {
-      return NextResponse.json({ error: 'Proveedor y total son obligatorios' }, { status: 400 })
+    if (!supplierId) {
+      return NextResponse.json({ error: 'El proveedor es obligatorio' }, { status: 400 })
+    }
+
+    // Calculate total from items; fallback to 0 if no items
+    const computedTotal = (items as Array<{ qty?: number; price?: number }>).reduce(
+      (sum, item) => sum + (Number(item.qty) || 0) * (Number(item.price) || 0),
+      0
+    )
+    if (computedTotal <= 0) {
+      return NextResponse.json({ error: 'Ingresa al menos un precio para calcular el total' }, { status: 400 })
     }
 
     const rq = await prisma.rQ.findUnique({ where: { id: rqId }, select: { status: true } })
@@ -59,27 +81,48 @@ export const POST = auth(async function POST(req: NextRequest & { auth: Session 
       return NextResponse.json({ error: 'La RQ no está en estado válido para agregar cotizaciones' }, { status: 409 })
     }
 
-    // Check duplicate supplier for this RQ
     const existing = await prisma.quote.findFirst({ where: { rqId, supplierId } })
-    if (existing) return NextResponse.json({ error: 'Ya existe una cotización de este proveedor para esta RQ' }, { status: 409 })
-
-    const quote = await prisma.quote.create({
-      data: {
-        rqId,
-        supplierId,
-        total,
-        currency,
-        validez: validez ? new Date(validez) : null,
-        leadTime: leadTime || null,
-        notes: notes || null,
-      },
-      include: { supplier: { select: { id: true, name: true } } },
-    })
-
-    // Advance status to EN_COMPARATIVO when first quote is added
-    if (rq.status === 'ENVIADA_COMPRAS') {
-      await prisma.rQ.update({ where: { id: rqId }, data: { status: 'EN_COMPARATIVO' } })
+    if (existing) {
+      return NextResponse.json({ error: 'Ya existe una cotización de este proveedor para esta RQ' }, { status: 409 })
     }
+
+    // Create Quote + QuoteItems in a transaction
+    const quote = await prisma.$transaction(async tx => {
+      const q = await tx.quote.create({
+        data: {
+          rqId,
+          supplierId,
+          total: computedTotal,
+          currency,
+          validez: validez ? new Date(validez) : null,
+          leadTime: leadTime || null,
+          notes: notes || null,
+        },
+        include: { supplier: { select: { id: true, name: true } } },
+      })
+
+      if (items.length > 0) {
+        await tx.quoteItem.createMany({
+          data: (items as Array<{ rqItemId?: string; uom?: string; qty?: number; price?: number; specNote?: string }>)
+            .filter(item => (Number(item.qty) || 0) > 0 || (Number(item.price) || 0) > 0)
+            .map(item => ({
+              quoteId: q.id,
+              rqItemId: item.rqItemId || null,
+              qty: Number(item.qty) || 0,
+              price: Number(item.price) || 0,
+              uom: item.uom || null,
+              specNote: item.specNote || null,
+            })),
+        })
+      }
+
+      // Advance to EN_COMPARATIVO on first quote
+      if (rq.status === 'ENVIADA_COMPRAS') {
+        await tx.rQ.update({ where: { id: rqId }, data: { status: 'EN_COMPARATIVO' } })
+      }
+
+      return q
+    })
 
     return NextResponse.json({ quote }, { status: 201 })
   } catch {
