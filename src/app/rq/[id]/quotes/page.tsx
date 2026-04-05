@@ -78,8 +78,13 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
   const [savingWinner, setSavingWinner] = useState(false)
   const [error, setError] = useState('')
 
+  // Comparison file upload
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [comparativeFileUrl, setComparativeFileUrl] = useState<string | null>(null)
+
   // Modal state
   const [modalSupplierId, setModalSupplierId] = useState('')
+  const [modalCurrency, setModalCurrency] = useState('COP')
   const [modalNotes, setModalNotes] = useState('')
   const [modalValidez, setModalValidez] = useState('')
   const [modalLeadTime, setModalLeadTime] = useState('')
@@ -99,6 +104,9 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
         setRq(d.rq)
         setSuppliers(d.suppliers)
         if (d.rq.comparison?.chosenId) setSelectedWinnerId(d.rq.comparison.chosenId)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const checklist = d.rq.comparison?.checklist as any
+        if (checklist?.comparisonFileUrl) setComparativeFileUrl(checklist.comparisonFileUrl)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -110,9 +118,29 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
     s => !rq?.quotes.some(q => q.supplierId === s.id)
   )
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingFile(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('rqId', params.id)
+      const res = await fetch(`/api/rq/${params.id}/comparison-file`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+      const data = await res.json()
+      if (res.ok) setComparativeFileUrl(data.url)
+    } catch { /* silent */ }
+    finally { setUploadingFile(false) }
+  }
+
   function openModal() {
     if (!rq) return
     setModalSupplierId('')
+    setModalCurrency('COP')
     setModalNotes('')
     setModalValidez('')
     setModalLeadTime('')
@@ -158,7 +186,7 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
         credentials: 'include',
         body: JSON.stringify({
           supplierId: modalSupplierId,
-          currency: 'COP',
+          currency: modalCurrency,
           validez: modalValidez || undefined,
           leadTime: modalLeadTime || undefined,
           notes: modalNotes || undefined,
@@ -214,16 +242,25 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
               <h1 className="mt-2 text-2xl font-bold">{loading ? '…' : rq?.code ?? params.id}</h1>
               {rq && <p className="mt-1 text-sm text-white/75 line-clamp-1">{rq.title}</p>}
             </div>
-            {!loading && !readonly && availableSuppliers.length > 0 && (
-              <button
-                onClick={openModal}
-                className="flex-shrink-0 inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Agregar cotización
-              </button>
+            {!loading && (
+              <div className="flex flex-shrink-0 flex-wrap gap-2">
+                {!readonly && availableSuppliers.length > 0 && (
+                  <button onClick={openModal}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Agregar cotización
+                  </button>
+                )}
+                <Link href={`/rq/${params.id}/email-suppliers?role=${role}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/30">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Enviar correo
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -351,6 +388,7 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
                           <>
                             <td key={`${q.id}-f1`} colSpan={3} className={isWinner ? 'bg-emerald-100' : ''} />
                             <td key={`${q.id}-tot`} className={`px-2 py-3 text-right font-mono text-base font-bold ${isWinner ? 'bg-yellow-200 text-emerald-900' : 'text-gray-800'}`}>
+                              <span className="text-xs font-normal opacity-60">{q.currency} </span>
                               {formatCOP(Number(q.total))}
                             </td>
                             <td key={`${q.id}-f2`} className={`border-r border-gray-300 ${isWinner ? 'bg-emerald-100' : ''}`} />
@@ -386,6 +424,35 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
                     )}
                   </tfoot>
                 </table>
+              </div>
+            )}
+
+            {/* Comparison file upload / download */}
+            {!readonly && (
+              <div className="flex items-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/50 px-5 py-3">
+                <svg className="h-5 w-5 flex-shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-xs font-semibold text-indigo-700">Cuadro comparativo (Excel)</span>
+                {comparativeFileUrl ? (
+                  <a href={comparativeFileUrl} target="_blank" rel="noreferrer"
+                    className="ml-auto rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition">
+                    Ver archivo ↗
+                  </a>
+                ) : (
+                  <span className="ml-auto text-xs text-indigo-400">No hay archivo adjunto</span>
+                )}
+                <label className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${uploadingFile ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                  {uploadingFile ? 'Subiendo…' : comparativeFileUrl ? 'Reemplazar' : 'Subir Excel'}
+                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={uploadingFile} onChange={handleFileUpload} />
+                </label>
+              </div>
+            )}
+            {!readonly && comparativeFileUrl && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+                <span className="text-xs text-emerald-700">✓ Archivo comparativo adjunto</span>
+                <a href={comparativeFileUrl} target="_blank" rel="noreferrer"
+                  className="text-xs font-semibold text-emerald-700 underline underline-offset-2">Descargar</a>
               </div>
             )}
 
@@ -430,7 +497,7 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={submitQuote} className="p-6">
               {/* Supplier + metadata */}
-              <div className="mb-5 grid gap-4 sm:grid-cols-4">
+              <div className="mb-5 grid gap-4 sm:grid-cols-5">
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Proveedor *</label>
                   <select
@@ -443,6 +510,15 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
                     {availableSuppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}{s.nit ? ` — NIT ${s.nit}` : ''}</option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Moneda</label>
+                  <select value={modalCurrency} onChange={e => setModalCurrency(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20">
+                    <option value="COP">COP — Peso colombiano</option>
+                    <option value="USD">USD — Dólar estadounidense</option>
+                    <option value="EUR">EUR — Euro</option>
                   </select>
                 </div>
                 <div>
@@ -468,7 +544,7 @@ export default function QuotesPage({ params }: { params: { id: string } }) {
                       <th className="px-3 py-2.5 text-center">Cant. Req.</th>
                       <th className="px-3 py-2.5 text-left">Unidad ofrecida</th>
                       <th className="px-3 py-2.5 text-right">Cantidad</th>
-                      <th className="px-3 py-2.5 text-right">Precio Unitario COP</th>
+                      <th className="px-3 py-2.5 text-right">P. Unitario ({modalCurrency})</th>
                       <th className="px-3 py-2.5 text-right">Precio Total</th>
                       <th className="min-w-[150px] px-3 py-2.5 text-left">Novedad / Observación</th>
                     </tr>
