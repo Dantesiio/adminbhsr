@@ -14,8 +14,6 @@ import { useRouter } from 'next/navigation'
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
   spec: z.string().optional(),
-  descripcion: z.string().optional(),
-  comentario: z.string().optional(),
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
   unitPrice: z.number().min(0).optional(),
@@ -57,7 +55,7 @@ interface RQData {
   projectId: string
   projectName: string
   costCenterId: string
-  items: { name: string; spec: string; descripcion: string; comentario: string; qty: number; uom: string; unitPrice: number; compraLocal: boolean; compraInternacional: boolean }[]
+  items: { name: string; spec: string; qty: number; uom: string; unitPrice: number; compraLocal: boolean; compraInternacional: boolean }[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -114,8 +112,6 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
         items: values.items.map((item) => ({
           name: item.name,
           spec: item.spec || '',
-          descripcion: item.descripcion || '',
-          comentario: item.comentario || '',
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
           precioEstimado: item.unitPrice || undefined,
@@ -124,6 +120,7 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
         })),
       }
       await updateRQ(rq.id, input)
+      router.push(`/rq/${rq.id}`)
     } catch (err) {
       setSubmitError('Error al guardar los cambios. Intenta de nuevo.')
       console.error(err)
@@ -228,7 +225,7 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
+                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -255,8 +252,8 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-[2fr_1fr_80px_90px_110px]">
                       <div>
-                        <label className={labelCls}>Nombre *</label>
-                        <input className={inputCls} placeholder="Nombre del producto/servicio" {...form.register(`items.${idx}.name`)} />
+                        <label className={labelCls}>Descripción *</label>
+                        <input className={inputCls} placeholder="Ej. Bolsa de drenaje 100ml, talla M, azul, certificado ISO 13485" {...form.register(`items.${idx}.name`)} />
                         {form.formState.errors.items?.[idx]?.name && (
                           <p className="mt-1 text-xs text-red-600">{form.formState.errors.items[idx]?.name?.message}</p>
                         )}
@@ -282,18 +279,6 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
                           <p className="mt-0.5 text-right text-[10px] text-brand-magenta font-medium">= {formatCOP(qty * unitPrice)}</p>
                         )}
                       </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Descripción técnica <span className="normal-case font-normal text-gray-400">(talla, peso, pulgadas, color, volumen…)</span></label>
-                      <textarea rows={2} className={inputCls}
-                        placeholder="Ej. Talla M, 100ml, color azul, certificado ISO 13485…"
-                        {...form.register(`items.${idx}.descripcion`)} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Comentario <span className="normal-case font-normal text-gray-400">(para qué, por qué, dónde se usa)</span></label>
-                      <textarea rows={2} className={inputCls}
-                        placeholder="Ej. Para cambio de drenaje post-quirúrgico en quirófano 2…"
-                        {...form.register(`items.${idx}.comentario`)} />
                     </div>
                     <div className="flex flex-wrap gap-6">
                       <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">

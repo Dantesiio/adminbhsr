@@ -290,9 +290,7 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wide text-gray-400">
                   <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Nombre</th>
-                  <th className="px-4 py-3 text-left">Descripción técnica</th>
-                  <th className="px-4 py-3 text-left">Comentario</th>
+                  <th className="px-4 py-3 text-left">Descripción</th>
                   <th className="px-4 py-3 text-right">Cant.</th>
                   <th className="px-4 py-3 text-left">Unidad</th>
                   <th className="px-4 py-3 text-right">Precio Unit</th>
@@ -311,12 +309,6 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
                       <td className="px-4 py-3 max-w-[180px]">
                         <span className="block text-sm font-medium text-gray-900">{item.name}</span>
                         {item.spec && <span className="block text-xs text-gray-400 mt-0.5">LP: {item.spec}</span>}
-                      </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        <span className="block text-xs text-gray-600 leading-relaxed">{item.descripcion || '—'}</span>
-                      </td>
-                      <td className="px-4 py-3 max-w-[160px]">
-                        <span className="block text-xs text-gray-600 leading-relaxed">{item.comentario || '—'}</span>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-sm text-gray-900">{Number(item.qty).toLocaleString('es-CO')}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{item.uom || 'unidad'}</td>

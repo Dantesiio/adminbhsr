@@ -18,8 +18,6 @@ interface RQPDFProps {
     items: Array<{
       spec?: string | null
       name: string
-      descripcion?: string | null
-      comentario?: string | null
       uom?: string | null
       qty: number | string
       precioEstimado?: number | string | null
@@ -600,10 +598,7 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14, i
           {items.map((item, idx) => (
             <View key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
               <Text style={[styles.td, styles.c1]}>{item.spec || ''}</Text>
-              <View style={[styles.td, styles.c3]}>
-                <Text style={{ fontSize: 5.5, color: '#333333' }}>{item.name}</Text>
-                {item.descripcion ? <Text style={styles.tdSub}>{item.descripcion}</Text> : null}
-              </View>
+              <Text style={[styles.td, styles.c3]}>{item.name}</Text>
               <Text style={[styles.td, styles.c4]}>{item.uom || ''}</Text>
               <Text style={[styles.td, styles.c5]}></Text>
               <Text style={[styles.tdRight, styles.c6]}>{item.qty}</Text>
@@ -617,7 +612,7 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14, i
               <Text style={[styles.td, styles.c10]}>{item.compraInternacional ? 'X' : ''}</Text>
               <Text style={[styles.td, styles.c11]}></Text>
               <Text style={[styles.td, styles.c12]}></Text>
-              <Text style={[styles.tdLast, styles.c13]}>{item.comentario || ''}</Text>
+              <Text style={[styles.tdLast, styles.c13]}></Text>
             </View>
           ))}
         </View>

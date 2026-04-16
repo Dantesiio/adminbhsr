@@ -14,8 +14,6 @@ import { useRouter } from 'next/navigation'
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
   spec: z.string().optional(),            // Línea de proyecto
-  descripcion: z.string().optional(),     // Detalle técnico
-  comentario: z.string().optional(),      // Contexto (para qué, por qué, dónde)
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
   unitPrice: z.number().min(0).optional(), // estimado, no se guarda en DB
@@ -78,7 +76,7 @@ export default function NewRQPage() {
   const form = useForm<RQForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(RQSchema) as any,
-    defaultValues: { items: [{ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '', ivaRate: 0 },
+    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '', ivaRate: 0 },
   })
   const { fields, append, remove, replace } = useFieldArray({ name: 'items', control: form.control })
 
@@ -127,8 +125,6 @@ export default function NewRQPage() {
         items: values.items.map((item) => ({
           name: item.name,
           spec: item.spec || '',
-          descripcion: item.descripcion || '',
-          comentario: item.comentario || '',
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
           precioEstimado: item.unitPrice || undefined,
@@ -184,8 +180,6 @@ export default function NewRQPage() {
       preview.items.map((item) => ({
         name: item.descripcion,
         spec: item.lineaProyecto || '',
-        descripcion: '',
-        comentario: '',
         qty: item.cantidad,
         uom: item.unidad || 'unidad',
         unitPrice: item.precioUnitario,
@@ -521,7 +515,7 @@ export default function NewRQPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
+                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -558,10 +552,10 @@ export default function NewRQPage() {
                     {/* Row 2: Name + Spec + UOM + Qty + Price */}
                     <div className="grid gap-3 sm:grid-cols-[2fr_1fr_80px_90px_110px]">
                       <div>
-                        <label className={labelCls}>Nombre del producto/servicio *</label>
+                        <label className={labelCls}>Descripción *</label>
                         <input
                           className={inputCls}
-                          placeholder="Ej. Bolsa de drenaje 100ml"
+                          placeholder="Ej. Bolsa de drenaje 100ml, talla M, azul, certificado ISO 13485"
                           {...form.register(`items.${idx}.name`)}
                         />
                         {form.formState.errors.items?.[idx]?.name && (
@@ -591,29 +585,7 @@ export default function NewRQPage() {
                       </div>
                     </div>
 
-                    {/* Row 3: Descripción técnica */}
-                    <div>
-                      <label className={labelCls}>Descripción técnica <span className="normal-case font-normal text-gray-400">(talla, peso, pulgadas, color, volumen…)</span></label>
-                      <textarea
-                        rows={2}
-                        className={inputCls}
-                        placeholder="Ej. Talla M, 100ml, color azul, certificado ISO 13485…"
-                        {...form.register(`items.${idx}.descripcion`)}
-                      />
-                    </div>
-
-                    {/* Row 4: Comentario */}
-                    <div>
-                      <label className={labelCls}>Comentario <span className="normal-case font-normal text-gray-400">(para qué, por qué, dónde se usa)</span></label>
-                      <textarea
-                        rows={2}
-                        className={inputCls}
-                        placeholder="Ej. Para cambio de drenaje post-quirúrgico en quirófano 2, reposición de stock…"
-                        {...form.register(`items.${idx}.comentario`)}
-                      />
-                    </div>
-
-                    {/* Row 5: Checkboxes */}
+                    {/* Row 3: Checkboxes */}
                     <div className="flex flex-wrap gap-6">
                       <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
                         <input

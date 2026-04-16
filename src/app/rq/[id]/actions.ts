@@ -2,17 +2,15 @@
 
 import { prisma } from '@/lib/prisma'
 import { getServerActionSession } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 // ─── updateRQ ─────────────────────────────────────────────────────────────────
 
 const UpdateItemSchema = z.object({
   name: z.string().min(1),
   spec: z.string().optional().default(''),
-  descripcion: z.string().optional().default(''),
-  comentario: z.string().optional().default(''),
   qty: z.coerce.number().positive(),
   uom: z.string().optional().default('unidad'),
   precioEstimado: z.coerce.number().min(0).optional(),
@@ -76,8 +74,6 @@ export async function updateRQ(rqId: string, input: UpdateRQInput) {
           create: data.items.map((i) => ({
             name: i.name,
             spec: i.spec,
-            descripcion: i.descripcion || null,
-            comentario: i.comentario || null,
             qty: i.qty,
             uom: i.uom,
             precioEstimado: i.precioEstimado !== undefined ? i.precioEstimado : null,
@@ -92,7 +88,7 @@ export async function updateRQ(rqId: string, input: UpdateRQInput) {
   revalidatePath(`/rq/${rqId}`)
   revalidatePath('/rq')
   revalidatePath('/dashboard')
-  redirect(`/rq/${rqId}`)
+  return { success: true }
 }
 
 export async function enviarACompras(rqId: string, role: string) {
