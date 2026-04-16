@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Layout from '@/components/Layout'
 import Link from 'next/link'
-import { getRoleFromQuery } from '@/lib/roles'
+import type { AppRole } from '@/lib/roles'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,14 +104,26 @@ function KPICard({ label, value, description, gradient, icon }: KPICardProps) {
 
 function DashboardContent() {
   const searchParams = useSearchParams()
-  const role = getRoleFromQuery(searchParams)
+  const urlRole = searchParams.get('role')?.toUpperCase() as AppRole | null
 
+  const [role, setRole] = useState<AppRole>(urlRole || 'SOLICITANTE')
   const [rqs, setRqs] = useState<RQRow[]>([])
   const [kpis, setKpis] = useState<KPIs>({ total: 0, inProcess: 0, approved: 0, closed: 0 })
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const limit = 10
+
+  // On first load, resolve role from session if no URL param
+  useEffect(() => {
+    if (!urlRole) {
+      fetch('/api/me', { credentials: 'include' })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d?.role) setRole(d.role as AppRole) })
+        .catch(() => {})
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setLoading(true)

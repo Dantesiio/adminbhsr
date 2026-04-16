@@ -83,6 +83,7 @@ model RQ {
   financiador        String?
   euroRate             Decimal?  @db.Decimal(14, 4)
   usdRate              Decimal?  @db.Decimal(14, 4)
+  ivaRate              Decimal?  @db.Decimal(5, 2) @default(0)
   fechaEntregaDeseada  DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt

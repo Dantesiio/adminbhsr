@@ -50,7 +50,8 @@ export const GET = auth(async function GET(req: NextRequest & { auth: Session | 
 
     const euroRate = rq.euroRate ? Number(rq.euroRate) : undefined
     const usdRate = rq.usdRate ? Number(rq.usdRate) : undefined
-    const element = createElement(RQPDF, { rq: rqData, logoBase64, euroRate, usdRate }) as unknown as ReactElement<DocumentProps>
+    const ivaRate = rq.ivaRate ? Number(rq.ivaRate) : 0
+    const element = createElement(RQPDF, { rq: rqData, logoBase64, euroRate, usdRate, ivaRate }) as unknown as ReactElement<DocumentProps>
     const pdfBuffer = await renderToBuffer(element)
 
     const arrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength) as ArrayBuffer

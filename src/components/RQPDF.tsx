@@ -17,7 +17,6 @@ interface RQPDFProps {
     project: { name: string }
     items: Array<{
       spec?: string | null
-      sitio?: string | null
       name: string
       uom?: string | null
       qty: number | string
@@ -27,6 +26,7 @@ interface RQPDFProps {
   logoBase64?: string
   euroRate?: number
   usdRate?: number
+  ivaRate?: number
 }
 
 // ─── Number formatter (Colombian locale, no Intl) ────────────────────────────
@@ -229,10 +229,9 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
 
-  // Column widths (13 cols, approx [45,35,120,40,40,40,60,60,40,45,40,55,55] = ~675)
+  // Column widths (12 cols, approx [45,155,40,40,40,60,60,40,45,40,55,55] = ~675)
   c1:  { width: 45 },
-  c2:  { width: 35 },
-  c3:  { width: 120 },
+  c3:  { width: 155 },
   c4:  { width: 40 },
   c5:  { width: 40 },
   c6:  { width: 40 },
@@ -416,7 +415,7 @@ const styles = StyleSheet.create({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }: RQPDFProps) {
+export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14, ivaRate = 0 }: RQPDFProps) {
   const moneda = rq.moneda || 'COP'
 
   const items = rq.items.map((item) => {
@@ -425,7 +424,9 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
     return { ...item, qty, precioEstimado: precio, precioTotal: qty * precio }
   })
 
-  const total = items.reduce((s, i) => s + i.precioTotal, 0)
+  const subtotal = items.reduce((s, i) => s + i.precioTotal, 0)
+  const ivaAmount = subtotal * (ivaRate / 100)
+  const total = subtotal + ivaAmount
   const totalEuro = total / euroRate
   const totalUsd = total / usdRate
 
@@ -573,7 +574,6 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
           {/* Column headers */}
           <View style={styles.tableHeaderRow}>
             <Text style={[styles.th, styles.c1]}>Línea de proyecto</Text>
-            <Text style={[styles.th, styles.c2]}>Sitio</Text>
             <Text style={[styles.th, styles.c3]}>Descripción</Text>
             <Text style={[styles.th, styles.c4]}>Unidad de manejo</Text>
             <Text style={[styles.th, styles.c5]}>PRESENTACION</Text>
@@ -591,7 +591,6 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
           {items.map((item, idx) => (
             <View key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
               <Text style={[styles.td, styles.c1]}>{item.spec || ''}</Text>
-              <Text style={[styles.td, styles.c2]}>{item.sitio || ''}</Text>
               <Text style={[styles.td, styles.c3]}>{item.name}</Text>
               <Text style={[styles.td, styles.c4]}>{item.uom || ''}</Text>
               <Text style={[styles.td, styles.c5]}></Text>
@@ -647,15 +646,7 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
           {/* Right column — totals */}
           <View style={styles.bottomRight}>
             <View style={styles.totalRow}>
-              <Text style={styles.totalAmount}>$ {fmt(total)}</Text>
-              <Text style={styles.totalLabel}>TOTAL</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalAmount}>$ {fmt(0)}</Text>
-              <Text style={styles.totalLabel}>Descuento</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalAmount}>$ {fmt(total)}</Text>
+              <Text style={styles.totalAmount}>$ {fmt(subtotal)}</Text>
               <Text style={styles.totalLabel}>SUBTOTAL</Text>
             </View>
             <View style={styles.totalRow}>
@@ -663,8 +654,8 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
               <Text style={styles.totalLabel}>GASTOS DE TRAN</Text>
             </View>
             <View style={styles.totalRow}>
-              <Text style={styles.totalAmount}></Text>
-              <Text style={styles.totalLabel}>Impuestos</Text>
+              <Text style={styles.totalAmount}>$ {ivaAmount > 0 ? fmt(ivaAmount) : ''}</Text>
+              <Text style={styles.totalLabel}>IVA {ivaRate > 0 ? `${ivaRate}%` : ''}</Text>
             </View>
             <View style={styles.totalRow}>
               <Text style={styles.totalAmount}>$ {fmt(total)}</Text>
@@ -718,10 +709,10 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14 }:
         {/* ══ 7. BASE ROW ══ */}
         <View style={styles.signatureBaseRow}>
           <View style={styles.sigCellBase}>
-            <Text style={styles.sigBaseText}>Base</Text>
+            <Text style={styles.sigBaseText}>{rq.requester.name || ''}</Text>
           </View>
           <View style={styles.sigCellBase}>
-            <Text style={styles.sigBaseText}>{rq.requester.name || ''}</Text>
+            <Text style={styles.sigBaseText}></Text>
           </View>
           <View style={styles.sigCellBase}>
             <Text style={styles.sigBaseText}></Text>

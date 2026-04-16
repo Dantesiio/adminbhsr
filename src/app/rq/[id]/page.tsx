@@ -86,6 +86,8 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
   if (!rq) notFound()
 
   const role = (searchParams.role?.toUpperCase() || 'USER') as string
+  // Show edit button for solicitante, compras, and admin roles — the edit page does the real auth check
+  const canEdit = rq.status !== 'CERRADA' && ['SOLICITANTE', 'COMPRAS', 'ADMIN'].includes(role)
   const stage = getStageByStatus(rq.status)
 
   // Parse unit price from spec (stored as "Precio unitario: $XX,XXX · ...")
@@ -231,6 +233,17 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
             </svg>
             Descargar RQ
           </a>
+          {canEdit && (
+            <Link
+              href={`/rq/${rq.id}/edit`}
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Editar RQ
+            </Link>
+          )}
           <Link
             href="/rq"
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 shadow-sm transition hover:bg-gray-50"

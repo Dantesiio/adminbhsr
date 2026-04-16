@@ -18,7 +18,6 @@ const ItemSchema = z.object({
   qty: z.coerce.number().positive('Debe ser > 0'),
   uom: z.string().optional().default('unidad'),
   precioEstimado: z.coerce.number().min(0).optional(),
-  sitio: z.string().optional().default(''),
 })
 
 const RQSchema = z.object({
@@ -32,6 +31,7 @@ const RQSchema = z.object({
   financiador: z.string().optional().default(''),
   euroRate: z.coerce.number().positive().optional(),
   usdRate: z.coerce.number().positive().optional(),
+  ivaRate: z.coerce.number().min(0).max(100).optional().default(0),
   fechaEntregaDeseada: z.string().optional(),
   items: z.array(ItemSchema).min(1, 'Agrega al menos 1 ítem'),
 })
@@ -71,6 +71,7 @@ export async function createRQ(input: CreateRQInput) {
         financiador: data.financiador || null,
         euroRate: data.euroRate ?? null,
         usdRate: data.usdRate ?? null,
+        ivaRate: data.ivaRate ?? 0,
         fechaEntregaDeseada: data.fechaEntregaDeseada ? new Date(data.fechaEntregaDeseada) : null,
         items: {
           create: data.items.map((i) => ({
@@ -79,7 +80,6 @@ export async function createRQ(input: CreateRQInput) {
             qty: i.qty,
             uom: i.uom,
             precioEstimado: i.precioEstimado !== undefined ? i.precioEstimado : null,
-            sitio: i.sitio || null,
           })),
         },
       },
@@ -236,7 +236,8 @@ export type ImportRQInput = {
   direccionEntrega?: string
   moneda?: string
   financiador?: string
-  items: { name: string; spec: string; qty: number; uom: string; precioEstimado?: number; sitio?: string }[]
+  ivaRate?: number
+  items: { name: string; spec: string; qty: number; uom: string; precioEstimado?: number }[]
 }
 
 /**
@@ -250,9 +251,7 @@ export async function importarRQ(input: ImportRQInput) {
     direccionEntrega: input.direccionEntrega || '',
     moneda: input.moneda || 'COP',
     financiador: input.financiador || '',
-    items: input.items.map((i) => ({
-      ...i,
-      sitio: i.sitio || '',
-    })),
+    ivaRate: input.ivaRate ?? 0,
+    items: input.items.map((i) => ({ ...i })),
   })
 }

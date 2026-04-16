@@ -17,7 +17,6 @@ const ItemSchema = z.object({
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
   unitPrice: z.number().min(0).optional(),  // estimado, no se guarda en DB
-  sitio: z.string().optional(),
 })
 
 const RQSchema = z.object({
@@ -31,6 +30,7 @@ const RQSchema = z.object({
   financiador: z.string().optional(),
   euroRate: z.number().positive().optional(),
   usdRate: z.number().positive().optional(),
+  ivaRate: z.number().min(0).max(100).default(0),
   fechaEntregaDeseada: z.string().optional(),
   items: z.array(ItemSchema).min(1, 'Agrega al menos 1 ítem'),
 })
@@ -74,7 +74,7 @@ export default function NewRQPage() {
   const form = useForm<RQForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(RQSchema) as any,
-    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0, sitio: '' }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '' },
+    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '', ivaRate: 0 },
   })
   const { fields, append, remove, replace } = useFieldArray({ name: 'items', control: form.control })
 
@@ -118,6 +118,7 @@ export default function NewRQPage() {
         financiador: values.financiador || '',
         euroRate: values.euroRate || undefined,
         usdRate: values.usdRate || undefined,
+        ivaRate: values.ivaRate ?? 0,
         fechaEntregaDeseada: values.fechaEntregaDeseada || undefined,
         items: values.items.map((item) => ({
           name: item.name,
@@ -125,7 +126,6 @@ export default function NewRQPage() {
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
           precioEstimado: item.unitPrice || undefined,
-          sitio: item.sitio || '',
         })),
       }
       const rq = await createRQ(input)
@@ -179,7 +179,6 @@ export default function NewRQPage() {
         qty: item.cantidad,
         uom: item.unidad || 'unidad',
         unitPrice: item.precioUnitario,
-        sitio: '',
       }))
     )
     if (preview.consecutivo) {
@@ -478,6 +477,15 @@ export default function NewRQPage() {
                 />
               </div>
 
+              <div>
+                <label className={labelCls}>IVA aplicable</label>
+                <select className={inputCls} {...form.register('ivaRate', { valueAsNumber: true })}>
+                  <option value={0}>Sin IVA (0%)</option>
+                  <option value={5}>IVA 5%</option>
+                  <option value={19}>IVA 19%</option>
+                </select>
+              </div>
+
               <div className="sm:col-span-2">
                 <label className={labelCls}>Dirección de entrega</label>
                 <input
@@ -501,7 +509,7 @@ export default function NewRQPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0, sitio: '' })}
+                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -512,10 +520,9 @@ export default function NewRQPage() {
             </div>
 
             {/* Table header */}
-            <div className="mb-2 hidden grid-cols-[2fr_1fr_1fr_80px_90px_110px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
+            <div className="mb-2 hidden grid-cols-[2fr_1fr_80px_90px_110px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
               <span>Descripción *</span>
               <span>Línea de Proyecto</span>
-              <span>Sitio</span>
               <span>Unidad</span>
               <span className="text-right">Cantidad</span>
               <span className="text-right">Precio Est. COP</span>
@@ -529,7 +536,7 @@ export default function NewRQPage() {
                 return (
                   <div
                     key={field.id}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_1fr_80px_90px_110px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
+                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_80px_90px_110px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
                   >
                     {/* Name */}
                     <div>
@@ -551,16 +558,6 @@ export default function NewRQPage() {
                         className={inputCls}
                         placeholder="Ej. 1.2.4"
                         {...form.register(`items.${idx}.spec`)}
-                      />
-                    </div>
-
-                    {/* Sitio */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Sitio</label>
-                      <input
-                        className={inputCls}
-                        placeholder="Sitio"
-                        {...form.register(`items.${idx}.sitio`)}
                       />
                     </div>
 
@@ -627,11 +624,26 @@ export default function NewRQPage() {
             {/* Total estimado */}
             {(() => {
               const allItems = form.watch('items') || []
-              const total = allItems.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0), 0)
+              const subtotal = allItems.reduce((s, i) => s + (i.qty || 0) * (i.unitPrice || 0), 0)
+              const ivaRate = form.watch('ivaRate') || 0
+              const iva = subtotal * (ivaRate / 100)
+              const total = subtotal + iva
               return total > 0 ? (
-                <div className="mt-3 flex justify-end rounded-xl bg-brand-magentaLight/40 px-4 py-2">
-                  <span className="text-sm text-brand-plum/70">Total estimado:&nbsp;</span>
-                  <span className="text-sm font-bold text-brand-magenta">{formatCOP(total)}</span>
+                <div className="mt-3 flex flex-col items-end gap-1 rounded-xl bg-brand-magentaLight/40 px-4 py-2">
+                  <div className="flex gap-3 text-sm">
+                    <span className="text-brand-plum/70">Subtotal:</span>
+                    <span className="font-semibold text-brand-plum">{formatCOP(subtotal)}</span>
+                  </div>
+                  {ivaRate > 0 && (
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-brand-plum/70">IVA {ivaRate}%:</span>
+                      <span className="font-semibold text-brand-plum">{formatCOP(iva)}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-3 text-sm">
+                    <span className="text-brand-plum/70">Total estimado:</span>
+                    <span className="font-bold text-brand-magenta">{formatCOP(total)}</span>
+                  </div>
                 </div>
               ) : null
             })()}
