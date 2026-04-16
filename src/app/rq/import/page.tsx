@@ -126,8 +126,12 @@ export default function ImportRQPage() {
       const items = parsed.items.map((item) => ({
         name: item.descripcion,
         spec: item.lineaProyecto || '',
+        descripcion: '',
+        comentario: '',
         qty: item.cantidad,
         uom: item.unidad || 'unidad',
+        compraLocal: false,
+        compraInternacional: false,
       }))
 
       const rq = await importarRQ({

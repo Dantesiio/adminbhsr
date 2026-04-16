@@ -18,9 +18,13 @@ interface RQPDFProps {
     items: Array<{
       spec?: string | null
       name: string
+      descripcion?: string | null
+      comentario?: string | null
       uom?: string | null
       qty: number | string
       precioEstimado?: number | string | null
+      compraLocal?: boolean
+      compraInternacional?: boolean
     }>
   }
   logoBase64?: string
@@ -227,6 +231,11 @@ const styles = StyleSheet.create({
     fontSize: 5.5,
     padding: 2,
     color: '#333333',
+  },
+  tdSub: {
+    fontSize: 4.5,
+    color: '#666666',
+    marginTop: 1,
   },
 
   // Column widths (12 cols, approx [45,155,40,40,40,60,60,40,45,40,55,55] = ~675)
@@ -591,7 +600,10 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14, i
           {items.map((item, idx) => (
             <View key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
               <Text style={[styles.td, styles.c1]}>{item.spec || ''}</Text>
-              <Text style={[styles.td, styles.c3]}>{item.name}</Text>
+              <View style={[styles.td, styles.c3]}>
+                <Text style={{ fontSize: 5.5, color: '#333333' }}>{item.name}</Text>
+                {item.descripcion ? <Text style={styles.tdSub}>{item.descripcion}</Text> : null}
+              </View>
               <Text style={[styles.td, styles.c4]}>{item.uom || ''}</Text>
               <Text style={[styles.td, styles.c5]}></Text>
               <Text style={[styles.tdRight, styles.c6]}>{item.qty}</Text>
@@ -601,11 +613,11 @@ export function RQPDF({ rq, logoBase64, euroRate = 4219.38, usdRate = 3674.14, i
               <Text style={[styles.tdRight, styles.c8]}>
                 {item.precioTotal > 0 ? fmt(item.precioTotal) : ''}
               </Text>
-              <Text style={[styles.td, styles.c9]}></Text>
-              <Text style={[styles.td, styles.c10]}></Text>
+              <Text style={[styles.td, styles.c9]}>{item.compraLocal ? 'X' : ''}</Text>
+              <Text style={[styles.td, styles.c10]}>{item.compraInternacional ? 'X' : ''}</Text>
               <Text style={[styles.td, styles.c11]}></Text>
               <Text style={[styles.td, styles.c12]}></Text>
-              <Text style={[styles.tdLast, styles.c13]}></Text>
+              <Text style={[styles.tdLast, styles.c13]}>{item.comentario || ''}</Text>
             </View>
           ))}
         </View>

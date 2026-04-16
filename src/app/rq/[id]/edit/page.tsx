@@ -54,9 +54,13 @@ export default async function EditRQPage({ params }: PageProps) {
     items: rq.items.map((item: any) => ({
       name: item.name,
       spec: item.spec || '',
+      descripcion: item.descripcion || '',
+      comentario: item.comentario || '',
       qty: Number(item.qty),
       uom: item.uom || 'unidad',
       unitPrice: item.precioEstimado ? Number(item.precioEstimado) : 0,
+      compraLocal: item.compraLocal ?? false,
+      compraInternacional: item.compraInternacional ?? false,
     })),
   }
 

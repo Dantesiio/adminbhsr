@@ -15,9 +15,13 @@ import { revalidatePath } from 'next/cache'
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
   spec: z.string().optional().default(''),
+  descripcion: z.string().optional().default(''),
+  comentario: z.string().optional().default(''),
   qty: z.coerce.number().positive('Debe ser > 0'),
   uom: z.string().optional().default('unidad'),
   precioEstimado: z.coerce.number().min(0).optional(),
+  compraLocal: z.boolean().optional().default(false),
+  compraInternacional: z.boolean().optional().default(false),
 })
 
 const RQSchema = z.object({
@@ -77,9 +81,13 @@ export async function createRQ(input: CreateRQInput) {
           create: data.items.map((i) => ({
             name: i.name,
             spec: i.spec,
+            descripcion: i.descripcion || null,
+            comentario: i.comentario || null,
             qty: i.qty,
             uom: i.uom,
             precioEstimado: i.precioEstimado !== undefined ? i.precioEstimado : null,
+            compraLocal: i.compraLocal ?? false,
+            compraInternacional: i.compraInternacional ?? false,
           })),
         },
       },
@@ -237,7 +245,7 @@ export type ImportRQInput = {
   moneda?: string
   financiador?: string
   ivaRate?: number
-  items: { name: string; spec: string; qty: number; uom: string; precioEstimado?: number }[]
+  items: { name: string; spec: string; descripcion: string; comentario: string; qty: number; uom: string; precioEstimado?: number; compraLocal: boolean; compraInternacional: boolean }[]
 }
 
 /**

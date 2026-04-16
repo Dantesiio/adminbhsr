@@ -13,10 +13,14 @@ import { useRouter } from 'next/navigation'
 
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
-  spec: z.string().optional(),   // lineaProyecto
+  spec: z.string().optional(),            // Línea de proyecto
+  descripcion: z.string().optional(),     // Detalle técnico
+  comentario: z.string().optional(),      // Contexto (para qué, por qué, dónde)
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
-  unitPrice: z.number().min(0).optional(),  // estimado, no se guarda en DB
+  unitPrice: z.number().min(0).optional(), // estimado, no se guarda en DB
+  compraLocal: z.boolean().optional().default(false),
+  compraInternacional: z.boolean().optional().default(false),
 })
 
 const RQSchema = z.object({
@@ -74,7 +78,7 @@ export default function NewRQPage() {
   const form = useForm<RQForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(RQSchema) as any,
-    defaultValues: { items: [{ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '', ivaRate: 0 },
+    defaultValues: { items: [{ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false }], consecutivo: '', direccionEntrega: '', moneda: 'COP', financiador: '', ivaRate: 0 },
   })
   const { fields, append, remove, replace } = useFieldArray({ name: 'items', control: form.control })
 
@@ -123,9 +127,13 @@ export default function NewRQPage() {
         items: values.items.map((item) => ({
           name: item.name,
           spec: item.spec || '',
+          descripcion: item.descripcion || '',
+          comentario: item.comentario || '',
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
           precioEstimado: item.unitPrice || undefined,
+          compraLocal: item.compraLocal ?? false,
+          compraInternacional: item.compraInternacional ?? false,
         })),
       }
       const rq = await createRQ(input)
@@ -175,10 +183,14 @@ export default function NewRQPage() {
     replace(
       preview.items.map((item) => ({
         name: item.descripcion,
-        spec: item.lineaProyecto ? `Línea: ${item.lineaProyecto}` : '',
+        spec: item.lineaProyecto || '',
+        descripcion: '',
+        comentario: '',
         qty: item.cantidad,
         uom: item.unidad || 'unidad',
         unitPrice: item.precioUnitario,
+        compraLocal: false,
+        compraInternacional: false,
       }))
     )
     if (preview.consecutivo) {
@@ -509,7 +521,7 @@ export default function NewRQPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 })}
+                onClick={() => append({ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -519,103 +531,108 @@ export default function NewRQPage() {
               </button>
             </div>
 
-            {/* Table header */}
-            <div className="mb-2 hidden grid-cols-[2fr_1fr_80px_90px_110px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
-              <span>Descripción *</span>
-              <span>Línea de Proyecto</span>
-              <span>Unidad</span>
-              <span className="text-right">Cantidad</span>
-              <span className="text-right">Precio Est. COP</span>
-              <span />
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-4">
               {fields.map((field, idx) => {
                 const qty = form.watch(`items.${idx}.qty`) || 0
                 const unitPrice = form.watch(`items.${idx}.unitPrice`) || 0
                 return (
                   <div
                     key={field.id}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_80px_90px_110px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
+                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3"
                   >
-                    {/* Name */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Descripción *</label>
-                      <input
-                        className={inputCls}
-                        placeholder="Descripción del producto o servicio"
-                        {...form.register(`items.${idx}.name`)}
-                      />
-                      {form.formState.errors.items?.[idx]?.name && (
-                        <p className="mt-1 text-xs text-red-600">{form.formState.errors.items[idx]?.name?.message}</p>
-                      )}
-                    </div>
-
-                    {/* Línea de Proyecto */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Línea de Proyecto</label>
-                      <input
-                        className={inputCls}
-                        placeholder="Ej. 1.2.4"
-                        {...form.register(`items.${idx}.spec`)}
-                      />
-                    </div>
-
-                    {/* UOM */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Unidad</label>
-                      <input
-                        className={inputCls}
-                        placeholder="unidad"
-                        {...form.register(`items.${idx}.uom`)}
-                      />
-                    </div>
-
-                    {/* Qty */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Cantidad</label>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        className={`${inputCls} text-right`}
-                        {...form.register(`items.${idx}.qty`, { valueAsNumber: true })}
-                      />
-                    </div>
-
-                    {/* Precio Estimado */}
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Precio Est. COP</label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className={`${inputCls} text-right`}
-                          placeholder="0"
-                          {...form.register(`items.${idx}.unitPrice`, { valueAsNumber: true })}
-                        />
-                        {qty > 0 && unitPrice > 0 && (
-                          <p className="mt-0.5 text-right text-[10px] text-brand-magenta font-medium">
-                            = {formatCOP(qty * unitPrice)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Remove */}
-                    <div className="flex justify-end sm:justify-center">
+                    {/* Row 1: header + delete */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-brand-magenta uppercase tracking-wide">Ítem {idx + 1}</span>
                       <button
                         type="button"
                         onClick={() => remove(idx)}
                         disabled={fields.length === 1}
-                        className="rounded-lg border border-red-200 p-2 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded-lg border border-red-200 p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </div>
+
+                    {/* Row 2: Name + Spec + UOM + Qty + Price */}
+                    <div className="grid gap-3 sm:grid-cols-[2fr_1fr_80px_90px_110px]">
+                      <div>
+                        <label className={labelCls}>Nombre del producto/servicio *</label>
+                        <input
+                          className={inputCls}
+                          placeholder="Ej. Bolsa de drenaje 100ml"
+                          {...form.register(`items.${idx}.name`)}
+                        />
+                        {form.formState.errors.items?.[idx]?.name && (
+                          <p className="mt-1 text-xs text-red-600">{form.formState.errors.items[idx]?.name?.message}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className={labelCls}>Línea de proyecto</label>
+                        <input className={inputCls} placeholder="Ej. LP-001" {...form.register(`items.${idx}.spec`)} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Unidad</label>
+                        <input className={inputCls} placeholder="Caja" {...form.register(`items.${idx}.uom`)} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Cantidad</label>
+                        <input type="number" min="0.01" step="0.01" className={`${inputCls} text-right`}
+                          {...form.register(`items.${idx}.qty`, { valueAsNumber: true })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Precio est. COP</label>
+                        <input type="number" min="0" step="0.01" className={`${inputCls} text-right`} placeholder="0"
+                          {...form.register(`items.${idx}.unitPrice`, { valueAsNumber: true })} />
+                        {qty > 0 && unitPrice > 0 && (
+                          <p className="mt-0.5 text-right text-[10px] text-brand-magenta font-medium">= {formatCOP(qty * unitPrice)}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 3: Descripción técnica */}
+                    <div>
+                      <label className={labelCls}>Descripción técnica <span className="normal-case font-normal text-gray-400">(talla, peso, pulgadas, color, volumen…)</span></label>
+                      <textarea
+                        rows={2}
+                        className={inputCls}
+                        placeholder="Ej. Talla M, 100ml, color azul, certificado ISO 13485…"
+                        {...form.register(`items.${idx}.descripcion`)}
+                      />
+                    </div>
+
+                    {/* Row 4: Comentario */}
+                    <div>
+                      <label className={labelCls}>Comentario <span className="normal-case font-normal text-gray-400">(para qué, por qué, dónde se usa)</span></label>
+                      <textarea
+                        rows={2}
+                        className={inputCls}
+                        placeholder="Ej. Para cambio de drenaje post-quirúrgico en quirófano 2, reposición de stock…"
+                        {...form.register(`items.${idx}.comentario`)}
+                      />
+                    </div>
+
+                    {/* Row 5: Checkboxes */}
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-brand-magenta accent-brand-magenta"
+                          {...form.register(`items.${idx}.compraLocal`)}
+                        />
+                        <span className="font-medium">Compra local</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-brand-magenta accent-brand-magenta"
+                          {...form.register(`items.${idx}.compraInternacional`)}
+                        />
+                        <span className="font-medium">Compra internacional</span>
+                      </label>
+                    </div>
+
                   </div>
                 )
               })}

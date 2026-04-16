@@ -11,9 +11,13 @@ import { revalidatePath } from 'next/cache'
 const UpdateItemSchema = z.object({
   name: z.string().min(1),
   spec: z.string().optional().default(''),
+  descripcion: z.string().optional().default(''),
+  comentario: z.string().optional().default(''),
   qty: z.coerce.number().positive(),
   uom: z.string().optional().default('unidad'),
   precioEstimado: z.coerce.number().min(0).optional(),
+  compraLocal: z.boolean().optional().default(false),
+  compraInternacional: z.boolean().optional().default(false),
 })
 
 const UpdateRQSchema = z.object({
@@ -72,9 +76,13 @@ export async function updateRQ(rqId: string, input: UpdateRQInput) {
           create: data.items.map((i) => ({
             name: i.name,
             spec: i.spec,
+            descripcion: i.descripcion || null,
+            comentario: i.comentario || null,
             qty: i.qty,
             uom: i.uom,
             precioEstimado: i.precioEstimado !== undefined ? i.precioEstimado : null,
+            compraLocal: i.compraLocal ?? false,
+            compraInternacional: i.compraInternacional ?? false,
           })),
         },
       },

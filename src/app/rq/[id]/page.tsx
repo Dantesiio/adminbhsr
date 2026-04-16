@@ -290,12 +290,14 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wide text-gray-400">
                   <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Descripción</th>
-                  <th className="px-4 py-3 text-left">Especificación</th>
-                  <th className="px-4 py-3 text-right">Cantidad</th>
+                  <th className="px-4 py-3 text-left">Nombre</th>
+                  <th className="px-4 py-3 text-left">Descripción técnica</th>
+                  <th className="px-4 py-3 text-left">Comentario</th>
+                  <th className="px-4 py-3 text-right">Cant.</th>
                   <th className="px-4 py-3 text-left">Unidad</th>
                   <th className="px-4 py-3 text-right">Precio Unit</th>
                   <th className="px-4 py-3 text-right">Subtotal</th>
+                  <th className="px-4 py-3 text-center">Compra</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -303,16 +305,18 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
                 {rq.items.map((item: any, idx: number) => {
                   const price = parsePrice(item.spec)
                   const rowTotal = price * Number(item.qty)
-                  // Clean spec for display (remove injected price)
-                  const displaySpec = (item.spec || '').replace(/Precio unitario:\s*\$[\d.,]+(\s*·\s*)?/i, '').trim()
                   return (
                     <tr key={item.id} className="hover:bg-brand-magentaLight/20 transition">
                       <td className="px-4 py-3 text-sm text-gray-400">{idx + 1}</td>
-                      <td className="px-4 py-3 max-w-[220px]">
-                        <span className="block text-sm font-medium text-gray-900 line-clamp-2">{item.name}</span>
-                      </td>
                       <td className="px-4 py-3 max-w-[180px]">
-                        <span className="block text-xs text-gray-500 line-clamp-2">{displaySpec || '—'}</span>
+                        <span className="block text-sm font-medium text-gray-900">{item.name}</span>
+                        {item.spec && <span className="block text-xs text-gray-400 mt-0.5">LP: {item.spec}</span>}
+                      </td>
+                      <td className="px-4 py-3 max-w-[160px]">
+                        <span className="block text-xs text-gray-600 leading-relaxed">{item.descripcion || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3 max-w-[160px]">
+                        <span className="block text-xs text-gray-600 leading-relaxed">{item.comentario || '—'}</span>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-sm text-gray-900">{Number(item.qty).toLocaleString('es-CO')}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{item.uom || 'unidad'}</td>
@@ -322,6 +326,11 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
                       <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-brand-plum">
                         {rowTotal > 0 ? formatCOP(rowTotal) : '—'}
                       </td>
+                      <td className="px-4 py-3 text-center text-xs">
+                        {item.compraLocal && <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 font-medium">Local</span>}
+                        {item.compraInternacional && <span className="inline-block rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 font-medium ml-1">Intl.</span>}
+                        {!item.compraLocal && !item.compraInternacional && <span className="text-gray-300">—</span>}
+                      </td>
                     </tr>
                   )
                 })}
@@ -329,12 +338,13 @@ export default async function RQDetailPage({ params, searchParams }: PageProps) 
               {totalEstimado > 0 && (
                 <tfoot>
                   <tr className="border-t border-brand-magenta/20 bg-brand-magentaLight/30">
-                    <td colSpan={6} className="px-4 py-3 text-right text-sm font-semibold text-brand-plum">
+                    <td colSpan={7} className="px-4 py-3 text-right text-sm font-semibold text-brand-plum">
                       Total estimado
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-base font-bold text-brand-magenta">
                       {formatCOP(totalEstimado)}
                     </td>
+                    <td />
                   </tr>
                 </tfoot>
               )}

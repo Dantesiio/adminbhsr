@@ -111,12 +111,15 @@ model RQItem {
   id   String  @id @default(cuid())
   rqId String
   rq   RQ      @relation(fields: [rqId], references: [id])
-  name String
-  spec String?
-  qty  Decimal @db.Decimal(12, 2)
-  uom  String? // unidad
-  precioEstimado  Decimal? @db.Decimal(14, 2)
-  sitio           String?
+  name             String
+  spec             String?   // Línea de proyecto
+  descripcion      String?   // Detalle técnico: talla, peso, pulgadas, color, volumen…
+  comentario       String?   // Contexto: para qué, por qué, dónde
+  qty              Decimal   @db.Decimal(12, 2)
+  uom              String?   // unidad
+  precioEstimado   Decimal?  @db.Decimal(14, 2)
+  compraLocal      Boolean   @default(false)
+  compraInternacional Boolean @default(false)
 
   quoteItems   QuoteItem[]
   receiptItems ReceiptItem[]

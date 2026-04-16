@@ -14,9 +14,13 @@ import { useRouter } from 'next/navigation'
 const ItemSchema = z.object({
   name: z.string().min(1, 'Requerido'),
   spec: z.string().optional(),
+  descripcion: z.string().optional(),
+  comentario: z.string().optional(),
   qty: z.number().positive('Debe ser > 0'),
   uom: z.string().optional(),
   unitPrice: z.number().min(0).optional(),
+  compraLocal: z.boolean().optional().default(false),
+  compraInternacional: z.boolean().optional().default(false),
 })
 
 const RQSchema = z.object({
@@ -53,7 +57,7 @@ interface RQData {
   projectId: string
   projectName: string
   costCenterId: string
-  items: { name: string; spec: string; qty: number; uom: string; unitPrice: number }[]
+  items: { name: string; spec: string; descripcion: string; comentario: string; qty: number; uom: string; unitPrice: number; compraLocal: boolean; compraInternacional: boolean }[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -110,9 +114,13 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
         items: values.items.map((item) => ({
           name: item.name,
           spec: item.spec || '',
+          descripcion: item.descripcion || '',
+          comentario: item.comentario || '',
           qty: Number(item.qty),
           uom: item.uom || 'unidad',
           precioEstimado: item.unitPrice || undefined,
+          compraLocal: item.compraLocal ?? false,
+          compraInternacional: item.compraInternacional ?? false,
         })),
       }
       await updateRQ(rq.id, input)
@@ -220,7 +228,7 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
               </h2>
               <button
                 type="button"
-                onClick={() => append({ name: '', spec: '', qty: 1, uom: 'unidad', unitPrice: 0 })}
+                onClick={() => append({ name: '', spec: '', descripcion: '', comentario: '', qty: 1, uom: 'unidad', unitPrice: 0, compraLocal: false, compraInternacional: false })}
                 className="flex items-center gap-1.5 rounded-xl border border-brand-magenta/30 px-3 py-2 text-xs font-semibold text-brand-magenta transition hover:bg-brand-magentaLight"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -230,74 +238,74 @@ export default function EditRQForm({ rq }: { rq: RQData }) {
               </button>
             </div>
 
-            <div className="mb-2 hidden grid-cols-[2fr_1fr_80px_90px_110px_40px] gap-3 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:grid">
-              <span>Descripción *</span>
-              <span>Línea de Proyecto</span>
-              <span>Unidad</span>
-              <span className="text-right">Cantidad</span>
-              <span className="text-right">Precio Est. COP</span>
-              <span />
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-4">
               {fields.map((field, idx) => {
                 const qty = form.watch(`items.${idx}.qty`) || 0
                 const unitPrice = form.watch(`items.${idx}.unitPrice`) || 0
                 return (
-                  <div
-                    key={field.id}
-                    className="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4 sm:grid-cols-[2fr_1fr_80px_90px_110px_40px] sm:items-center sm:bg-transparent sm:border-0 sm:p-0"
-                  >
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Descripción *</label>
-                      <input className={inputCls} placeholder="Descripción" {...form.register(`items.${idx}.name`)} />
-                      {form.formState.errors.items?.[idx]?.name && (
-                        <p className="mt-1 text-xs text-red-600">{form.formState.errors.items[idx]?.name?.message}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Línea de Proyecto</label>
-                      <input className={inputCls} placeholder="Ej. 1.2.4" {...form.register(`items.${idx}.spec`)} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Unidad</label>
-                      <input className={inputCls} placeholder="unidad" {...form.register(`items.${idx}.uom`)} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Cantidad</label>
-                      <input
-                        type="number" min="0.01" step="0.01"
-                        className={`${inputCls} text-right`}
-                        {...form.register(`items.${idx}.qty`, { valueAsNumber: true })}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-gray-400 sm:hidden">Precio Est. COP</label>
-                      <div className="relative">
-                        <input
-                          type="number" min="0" step="0.01"
-                          className={`${inputCls} text-right`}
-                          placeholder="0"
-                          {...form.register(`items.${idx}.unitPrice`, { valueAsNumber: true })}
-                        />
-                        {qty > 0 && unitPrice > 0 && (
-                          <p className="mt-0.5 text-right text-[10px] text-brand-magenta font-medium">
-                            = {formatCOP(qty * unitPrice)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex justify-end sm:justify-center">
-                      <button
-                        type="button"
-                        onClick={() => remove(idx)}
-                        disabled={fields.length === 1}
-                        className="rounded-lg border border-red-200 p-2 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
+                  <div key={field.id} className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-brand-magenta uppercase tracking-wide">Ítem {idx + 1}</span>
+                      <button type="button" onClick={() => remove(idx)} disabled={fields.length === 1}
+                        className="rounded-lg border border-red-200 p-1.5 text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[2fr_1fr_80px_90px_110px]">
+                      <div>
+                        <label className={labelCls}>Nombre *</label>
+                        <input className={inputCls} placeholder="Nombre del producto/servicio" {...form.register(`items.${idx}.name`)} />
+                        {form.formState.errors.items?.[idx]?.name && (
+                          <p className="mt-1 text-xs text-red-600">{form.formState.errors.items[idx]?.name?.message}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className={labelCls}>Línea proyecto</label>
+                        <input className={inputCls} placeholder="LP-001" {...form.register(`items.${idx}.spec`)} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Unidad</label>
+                        <input className={inputCls} placeholder="Caja" {...form.register(`items.${idx}.uom`)} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Cantidad</label>
+                        <input type="number" min="0.01" step="0.01" className={`${inputCls} text-right`}
+                          {...form.register(`items.${idx}.qty`, { valueAsNumber: true })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Precio est. COP</label>
+                        <input type="number" min="0" step="0.01" className={`${inputCls} text-right`} placeholder="0"
+                          {...form.register(`items.${idx}.unitPrice`, { valueAsNumber: true })} />
+                        {qty > 0 && unitPrice > 0 && (
+                          <p className="mt-0.5 text-right text-[10px] text-brand-magenta font-medium">= {formatCOP(qty * unitPrice)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Descripción técnica <span className="normal-case font-normal text-gray-400">(talla, peso, pulgadas, color, volumen…)</span></label>
+                      <textarea rows={2} className={inputCls}
+                        placeholder="Ej. Talla M, 100ml, color azul, certificado ISO 13485…"
+                        {...form.register(`items.${idx}.descripcion`)} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Comentario <span className="normal-case font-normal text-gray-400">(para qué, por qué, dónde se usa)</span></label>
+                      <textarea rows={2} className={inputCls}
+                        placeholder="Ej. Para cambio de drenaje post-quirúrgico en quirófano 2…"
+                        {...form.register(`items.${idx}.comentario`)} />
+                    </div>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 accent-brand-magenta"
+                          {...form.register(`items.${idx}.compraLocal`)} />
+                        <span className="font-medium">Compra local</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
+                        <input type="checkbox" className="h-4 w-4 rounded border-gray-300 accent-brand-magenta"
+                          {...form.register(`items.${idx}.compraInternacional`)} />
+                        <span className="font-medium">Compra internacional</span>
+                      </label>
                     </div>
                   </div>
                 )
