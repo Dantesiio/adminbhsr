@@ -11,6 +11,7 @@ export default async function EditRQPage({ params }: PageProps) {
   const session = await getServerActionSession()
   if (!session?.user?.id) redirect('/login')
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rq: any = null
   try {
     rq = await prisma.rQ.findUnique({
@@ -51,6 +52,7 @@ export default async function EditRQPage({ params }: PageProps) {
     projectId: rq.projectId,
     projectName: rq.project.name,
     costCenterId: rq.costCenterId || '',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     items: rq.items.map((item: any) => ({
       name: item.name,
       spec: item.spec || '',
